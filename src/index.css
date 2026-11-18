@@ -2,51 +2,107 @@
 
 @layer base {
   :root {
-    --font-serif: 'Cormorant Garamond', Georgia, serif;
-    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+    --font-sans: 'Plus Jakarta Sans', 'Manrope', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-serif: 'Fraunces', Georgia, serif;
+    --font-handwriting: 'Caveat', cursive;
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #080909;
-    color: #F2F5F4;
+    background-color: #F0EBE1;
+    color: #141618;
     overflow-x: hidden;
   }
 
-  h1, h2, h3, .font-display {
-    font-family: var(--font-serif);
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   .font-mono-num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
-}
 
-@keyframes marqueeScroll {
-  0% {
-    transform: translate3d(0%, 0, 0);
+  .font-serif {
+    font-family: var(--font-serif);
   }
-  100% {
-    transform: translate3d(-50%, 0, 0);
+
+  .font-handwriting {
+    font-family: var(--font-handwriting);
+  }
+
+  /* Notebook Lined Paper Background (as in user reference) */
+  .notebook-paper {
+    background-color: #F8F4EC;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 27px,
+      rgba(215, 203, 185, 0.45) 28px
+    );
+  }
+
+  /* Custom clean warm scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #F0EBE1;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D8D2C5;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #B8B0A2;
   }
 }
 
-.animate-marquee {
-  display: flex;
-  width: max-content;
-  will-change: transform;
-  animation: marqueeScroll 28s linear infinite;
+/* Authentic translucent paper tape for preview mockups */
+.paper-tape {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.animate-marquee:hover {
-  animation-play-state: paused;
+/* Subtle striped pattern for buttons */
+.button-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(255, 255, 255, 0.15) 6px,
+    rgba(255, 255, 255, 0.15) 12px
+  );
+}
+
+/* Picket fence pattern for footer */
+.fence-strip {
+  background-repeat: repeat-x;
+  background-position: bottom;
+  height: 24px;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
+  .animate-float-slow {
     animation: none;
   }
 }
-

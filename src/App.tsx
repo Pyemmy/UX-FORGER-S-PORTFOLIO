@@ -1,1185 +1,1042 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  Plus,
-  X,
-  Check,
+  ExternalLink,
+  Award,
+  Sparkles,
+  Layers,
+  Terminal,
+  FileText,
+  Download,
+  Mail,
   Copy,
+  Check,
+  CheckCircle2,
+  Clock,
+  Compass,
+  Zap,
+  Globe,
+  Send,
+  Code2,
+  Command,
+  Search,
+  MessageSquare,
+  Smile,
   Gamepad2,
-  UtensilsCrossed,
+  Briefcase,
+  Menu,
+  X,
 } from 'lucide-react';
 import {
-  HERO_PILLARS,
-  MARQUEE_ITEMS,
+  PERSONAL_INFO,
+  AWARDS_LIST,
   PROJECTS,
-  STATS_STRIP,
-  EXPERIENCES,
-  SERVICES,
-  PROCESS_STEPS,
-  STACK_ITEMS,
-  INITIAL_TESTIMONIALS,
-  PRICING_TIERS,
+  CAPABILITIES,
+  EXPERIMENTS,
+  TESTIMONIALS,
   ProjectItem,
-  TestimonialItem,
+  BEYOND_WORK_ITEMS,
 } from './data/portfolioData';
-import {
-  ProjectCaseStudyModal,
-  ResumePreviewModal,
-  AddTestimonialModal,
-} from './components/PortfolioModals';
-import portraitImg from './assets/images/owoade_portrait_suit_1790590966249.jpg';
+import { MascotBuddies } from './components/MascotBuddies';
+import { FrostedCanvasFrame } from './components/FrostedCanvasFrame';
+import { EditorialProjectCard } from './components/EditorialProjectCard';
+import { CompanyBricks } from './components/CompanyBricks';
+import { InteractiveChatPhone } from './components/InteractiveChatPhone';
+import { PlaygroundInteractiveToys } from './components/PlaygroundInteractiveToys';
+import { TestimonialCarousel } from './components/TestimonialCarousel';
+import { ForgeConsole } from './components/ForgeConsole';
+import { FullScreenCaseStudy } from './components/FullScreenCaseStudy';
+import { ResumeModal } from './components/ResumeModal';
+import { InteractivePhotoBook } from './components/InteractivePhotoBook';
+import { sounds } from './utils/audio';
 
 export default function App() {
-  // Interactive state
-  const [activeHeroPillar, setActiveHeroPillar] = useState<number>(0);
-  const [projectFilter, setProjectFilter] = useState<
-    'All' | 'Mobile App' | 'Web & AI' | 'Fintech' | 'Game Design'
-  >('All');
+  // Navigation & Project Filter State
+  const [activeProjectFilter, setActiveProjectFilter] = useState<'ALL' | 'SHIPPED_AI' | 'CASE_STUDY'>('ALL');
   const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
-  const [openServiceId, setOpenServiceId] = useState<string>('ui-ux');
-  const [activeStackSkill, setActiveStackSkill] = useState<string | null>(null);
-  const [testimonials, setTestimonials] = useState<TestimonialItem[]>(INITIAL_TESTIMONIALS);
-  const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
-  const [portraitError, setPortraitError] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Contact form & email copy state
+  // Email copy state
   const [copiedEmail, setCopiedEmail] = useState(false);
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactMessage, setContactMessage] = useState('');
-  const [selectedPackage, setSelectedPackage] = useState<string>('');
-  const [messageSent, setMessageSent] = useState(false);
 
-  const filteredGridProjects = PROJECTS.filter((p) => {
-    if (p.featured && projectFilter === 'All') return false;
-    if (projectFilter === 'All') return true;
-    return p.filterTag === projectFilter;
-  });
+  // Keyboard shortcut Cmd+K / Ctrl+K for Forge Console
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsConsoleOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-  const featuredProject = PROJECTS.find((p) => p.featured);
+  // Handle URL Hash deep linking for case studies (#work/:slug)
+  useEffect(() => {
+    const checkHash = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#work/')) {
+        const slug = hash.replace('#work/', '').toLowerCase();
+        const found = PROJECTS.find((p) => p.slug === slug || p.id === slug);
+        if (found) {
+          setSelectedProject(found);
+        }
+      } else if (!hash.includes('#work/')) {
+        setSelectedProject(null);
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
+  const openProject = (project: ProjectItem) => {
+    setSelectedProject(project);
+    window.location.hash = `work/${project.slug}`;
+  };
+
+  const closeProject = () => {
+    setSelectedProject(null);
+    if (window.location.hash.includes('#work/')) {
+      history.pushState('', document.title, window.location.pathname + window.location.search);
+    }
+  };
 
   const scrollToSection = (id: string) => {
-    const el = document.getElementById(id);
+    setIsMobileMenuOpen(false);
+    const targetId = id === 'experiments' ? 'playground' : (id === 'about' ? 'experience' : id);
+    const el = document.getElementById(targetId) || document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleSelectPricing = (tierName: string, price: string) => {
-    setSelectedPackage(`${tierName} (${price})`);
-    setContactMessage(
-      `Hi Owoade, I'd like to get started with the ${tierName} package (${price}). Here are a few details about my timeline and goals:`
-    );
-    scrollToSection('contact');
-  };
-
-  const handleInquireProject = (projectName: string) => {
-    setSelectedPackage(`Similar to ${projectName}`);
-    setContactMessage(
-      `Hi Owoade, I just reviewed your ${projectName} case study and would love to discuss a similar product design project.`
-    );
-    scrollToSection('contact');
-  };
-
   const handleCopyEmail = () => {
-    navigator.clipboard?.writeText('owoadeopeyemi11@gmail.com');
+    sounds.playChime();
+    navigator.clipboard?.writeText(PERSONAL_INFO.email);
     setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2500);
+    setTimeout(() => setCopiedEmail(false), 2400);
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactName.trim() || !contactEmail.trim() || !contactMessage.trim()) return;
-    setMessageSent(true);
-    setTimeout(() => {
-      setContactName('');
-      setContactEmail('');
-      setContactMessage('');
-      setSelectedPackage('');
-      setMessageSent(false);
-    }, 4000);
+  const handleInquireProject = (_projectName: string) => {
+    closeProject();
+    scrollToSection('contact');
+    handleCopyEmail();
   };
+
+  const filteredProjects = PROJECTS.filter((proj) => {
+    if (activeProjectFilter === 'ALL') return true;
+    if (activeProjectFilter === 'SHIPPED_AI') return proj.category === 'Shipped AI Build';
+    if (activeProjectFilter === 'CASE_STUDY') return proj.category === 'Product Case Study';
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-[#080909] text-[#F2F5F4] selection:bg-[#14B8A6]/30 selection:text-[#2DD4BF]">
-      {/* =====================================================================
-          TOP NAVIGATION BAR (Strict 3-Zone Contract)
-         ===================================================================== */}
-      <header className="sticky top-0 z-40 h-16 bg-[#080909]/90 backdrop-blur-md border-b border-white/[0.06] px-6 lg:px-16 flex items-center justify-between">
-        {/* Zone 1: Brand Title (Single text element wordmark) */}
-        <a
-          href="#top"
-          className="font-display text-lg sm:text-xl font-semibold tracking-tight text-white whitespace-nowrap shrink-0"
-        >
-          The <span className="italic font-normal text-[#14B8A6]">UX</span> Forger
-        </a>
-
-        {/* Zone 2: 5 Single-Line Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8 text-xs font-mono-num tracking-wider text-[#8C9694]">
-          <a
-            href="#work"
-            className="hover:text-white transition-colors duration-150 py-1 border-b border-transparent hover:border-[#14B8A6] whitespace-nowrap"
-          >
-            Work
-          </a>
-          <a
-            href="#experience"
-            className="hover:text-white transition-colors duration-150 py-1 border-b border-transparent hover:border-[#14B8A6] whitespace-nowrap"
-          >
-            Experience
-          </a>
-          <a
-            href="#about"
-            className="hover:text-white transition-colors duration-150 py-1 border-b border-transparent hover:border-[#14B8A6] whitespace-nowrap"
-          >
-            About
-          </a>
-          <a
-            href="#services"
-            className="hover:text-white transition-colors duration-150 py-1 border-b border-transparent hover:border-[#14B8A6] whitespace-nowrap"
-          >
-            Services
-          </a>
-          <a
-            href="#contact"
-            className="hover:text-white transition-colors duration-150 py-1 border-b border-transparent hover:border-[#14B8A6] whitespace-nowrap"
-          >
-            Contact
-          </a>
-        </nav>
-
-        {/* Zone 3: Primary Action */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => scrollToSection('contact')}
-            className="px-4 py-2 text-xs font-mono-num tracking-wider text-[#14B8A6] border border-[#14B8A6]/50 hover:bg-[#14B8A6] hover:text-[#041110] transition-colors duration-150 cursor-pointer whitespace-nowrap shrink-0"
-          >
-            Hire Me
-          </button>
-        </div>
-      </header>
-
-      {/* =====================================================================
-          HERO SECTION
-         ===================================================================== */}
-      <section
-        id="top"
-        className="relative pt-16 sm:pt-24 lg:pt-28 pb-12 px-6 lg:px-16 max-w-[1440px] mx-auto"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-start">
-          {/* Left Hero Column */}
-          <div className="lg:col-span-8">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-6"
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-[#F0EBE1] text-[#141618] font-sans selection:bg-[#F4C01E] selection:text-[#121316]">
+        {/* =====================================================================
+            1. MINIMAL, STREAMLINED NAVIGATION (Inspired by reference image 2)
+           ===================================================================== */}
+        <header className="sticky top-4 z-40 px-4 sm:px-6 max-w-4xl mx-auto">
+          <div className="bg-[#FAF7F2]/95 backdrop-blur-md border border-[#D5CEBF] shadow-[0_8px_30px_rgba(0,0,0,0.06)] rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+            {/* Brand Logo / Text: The UX Forger with real unedited photograph */}
+            <a
+              href="#top"
+              className="flex items-center gap-2.5 hover:opacity-85 transition-opacity shrink-0"
             >
-              <span className="w-6 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-              <span>UI/UX &amp; PRODUCT DESIGNER · LAGOS, NIGERIA</span>
-            </motion.div>
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-[#D5CEBF] bg-[#141618] shrink-0 shadow-xs ring-1 ring-black/10">
+                <img
+                  src="/assets/aistudio/IMG_9969_f5884aae.jpeg"
+                  alt="The UX Forger"
+                  className="w-full h-full object-cover object-top"
+                />
+              </div>
+              <span className="font-display font-extrabold text-sm sm:text-base tracking-tight text-[#141618] whitespace-nowrap">
+                The UX Forger
+              </span>
+            </a>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-              className="font-display text-6xl sm:text-7xl lg:text-[92px] leading-[0.94] tracking-tight font-semibold text-white mb-8"
-            >
-              <span className="block">Owoade</span>
-              <span className="block italic font-normal text-[#139E93] mt-1">Opeyemi</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="text-base sm:text-lg text-[#8C9694] max-w-xl leading-relaxed mb-10"
-            >
-              I design <strong className="text-white font-semibold">clean interfaces</strong> with
-              better user experience —{' '}
-              <strong className="text-white font-semibold">highly converting</strong>, deeply
-              intentional, and built to solve real problems.
-            </motion.p>
-
-            {/* Primary & Secondary CTAs */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-wrap items-center gap-4"
-            >
-              <button
-                onClick={() => scrollToSection('work')}
-                className="px-6 py-3.5 bg-[#0F8A82] hover:bg-[#14A399] text-white text-xs font-mono-num tracking-wider font-medium flex items-center gap-2.5 transition-transform duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            {/* Exactly 5 Visible Nav Links with Color Accent Bullets (reference image 2) */}
+            <nav className="hidden md:flex items-center gap-6 text-xs font-mono font-semibold text-[#52525B]">
+              <a
+                href="#work"
+                className="hover:text-[#141618] transition-colors flex items-center gap-1.5 py-1"
               >
-                <span>VIEW WORK</span>
-                <ArrowDown className="w-3.5 h-3.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F4BE24]" />
+                <span>Work</span>
+              </a>
+              <a
+                href="#capabilities"
+                className="hover:text-[#141618] transition-colors flex items-center gap-1.5 py-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#3062F7]" />
+                <span>Expertise</span>
+              </a>
+              <a
+                href="#about"
+                className="hover:text-[#141618] transition-colors flex items-center gap-1.5 py-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#EE5828]" />
+                <span>About</span>
+              </a>
+              <a
+                href="#playground"
+                className="hover:text-[#141618] transition-colors flex items-center gap-1.5 py-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#9B8AF5]" />
+                <span>Playground</span>
+              </a>
+              <a
+                href="#contact"
+                className="hover:text-[#141618] transition-colors flex items-center gap-1.5 py-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2FA06A]" />
+                <span>Contact</span>
+              </a>
+            </nav>
+
+            {/* Single Prominent CTA: Let's Talk */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => scrollToSection('contact')}
+                className="px-4 sm:px-5 py-2 bg-[#F4BE24] hover:bg-[#E5AE18] text-[#141618] font-display font-bold text-xs sm:text-sm rounded-full shadow-[0_2px_10px_rgba(244,190,36,0.3)] transition-all flex items-center gap-1.5 cursor-pointer hover:scale-102 active:scale-98"
+              >
+                <span>Let&apos;s Talk</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
+              {/* Mobile Menu Hamburger Toggle */}
               <button
-                onClick={() => setIsResumeModalOpen(true)}
-                className="px-6 py-3.5 bg-transparent hover:bg-white/[0.04] text-[#9BA5A3] hover:text-white border border-white/10 hover:border-white/25 text-xs font-mono-num tracking-wider flex items-center gap-2.5 transition-colors duration-150 cursor-pointer whitespace-nowrap"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label="Toggle navigation menu"
+                className="md:hidden p-2 text-[#141618] hover:bg-black/5 rounded-full transition-colors cursor-pointer"
               >
-                <span>DOWNLOAD RESUME</span>
-                <ArrowDown className="w-3.5 h-3.5" />
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
-            </motion.div>
+            </div>
           </div>
 
-          {/* Right Hero Column: Stacked Proof Metrics */}
-          <motion.div
-            initial={{ opacity: 0, x: 14 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3.5 w-full lg:max-w-[260px] lg:ml-auto"
+          {/* Mobile Drawer Menu */}
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="md:hidden mt-2 bg-[#FAF7F2] border border-[#D5CEBF] rounded-2xl p-4 shadow-xl flex flex-col gap-3 font-mono text-xs font-bold"
+              >
+                <a
+                  href="#work"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-xl hover:bg-[#EAE4D7] flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#F4BE24]" />
+                  <span>Work (Selected Builds)</span>
+                </a>
+                <a
+                  href="#capabilities"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-xl hover:bg-[#EAE4D7] flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#3062F7]" />
+                  <span>Expertise (What I Work On)</span>
+                </a>
+                <a
+                  href="#about"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-xl hover:bg-[#EAE4D7] flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#EE5828]" />
+                  <span>About (Story &amp; Photo Book)</span>
+                </a>
+                <a
+                  href="#playground"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-xl hover:bg-[#EAE4D7] flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#9B8AF5]" />
+                  <span>Playground (Lab &amp; Toys)</span>
+                </a>
+                <a
+                  href="#contact"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-xl hover:bg-[#EAE4D7] flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#2FA06A]" />
+                  <span>Contact &amp; Booking</span>
+                </a>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </header>
+
+        {/* =====================================================================
+            2. HERO SECTION — EXACTLY FIVE MASCOTS IN CIRCULAR FORMATION
+           ===================================================================== */}
+        <section id="top" className="relative pt-16 sm:pt-24 pb-20 px-4 sm:px-6 max-w-4xl mx-auto text-center">
+          {/* Status Kicker Badge */}
+          <div className="relative mb-6 flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#EAE4D7] border border-[#D5CEBF] rounded-full text-xs font-mono text-[#52525B] relative z-10 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-[#2FA06A] animate-pulse" />
+              <span>Product Designer &amp; Design Engineer · Lagos / Remote</span>
+            </div>
+          </div>
+
+          {/* Big Block Letters Headline with circular mascot orbit around it */}
+          <div className="relative flex flex-wrap items-center justify-center gap-2 sm:gap-3.5 max-w-3xl mx-auto mb-8 font-display">
+            {/* The 5 Floating Mascots in Circular Formation */}
+            <MascotBuddies />
+
+            {/* [I design] block - Royal Blue */}
+            <motion.span
+              whileHover={{ scale: 1.05, rotate: -2 }}
+              whileTap={{ scale: 0.96 }}
+              className="px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#3062F7] text-white text-3xl sm:text-5xl lg:text-6xl font-extrabold rounded-2xl shadow-sm -rotate-1 select-none cursor-pointer"
+            >
+              I design
+            </motion.span>
+
+            {/* [products] block - Golden Yellow */}
+            <motion.span
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.96 }}
+              className="px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#F4BE24] text-[#121316] text-3xl sm:text-5xl lg:text-6xl font-extrabold rounded-2xl shadow-sm rotate-1 select-none cursor-pointer"
+            >
+              products
+            </motion.span>
+
+            {/* [and I] block - Warm Paper Outline */}
+            <motion.span
+              whileHover={{ scale: 1.05, rotate: -1 }}
+              whileTap={{ scale: 0.96 }}
+              className="px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#FAF7F2] text-[#141618] border-2 border-[#D5CEBF] text-3xl sm:text-5xl lg:text-6xl font-extrabold rounded-2xl shadow-sm -rotate-1 select-none cursor-pointer"
+            >
+              and I
+            </motion.span>
+
+            {/* [ship them.] block - Terracotta Coral */}
+            <motion.span
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.96 }}
+              className="px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#EE5828] text-white text-3xl sm:text-5xl lg:text-6xl font-extrabold rounded-2xl shadow-sm rotate-1 select-none cursor-pointer"
+            >
+              ship them.
+            </motion.span>
+          </div>
+
+          {/* Subtitle Statement with Breathing Room for Future Photo */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="text-base sm:text-xl text-[#52525B] max-w-2xl mx-auto leading-relaxed mb-8 font-sans font-medium"
           >
-            <div className="flex-1 bg-[#0E1212] border border-white/[0.06] border-l-2 border-l-[#14B8A6] px-5 py-4">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">
-                2<span className="text-[#14B8A6] text-xl ml-0.5">+</span>
-              </div>
-              <div className="text-[11px] font-mono-num tracking-wider text-[#7A8583] mt-1">
-                YEARS DESIGNING
-              </div>
+            I solve product problems, shape intuitive user experiences, and get involved in building them too. Bridging product thinking, Figma design systems, and rapid front-end engineering.
+          </motion.p>
+
+          {/* Primary CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="flex flex-wrap items-center justify-center gap-3 sm:gap-4"
+          >
+            <button
+              onClick={() => scrollToSection('contact')}
+              className="px-6 py-3 bg-[#141618] hover:bg-[#3062F7] text-white text-xs sm:text-sm font-display font-bold rounded-full shadow-md transition-all cursor-pointer flex items-center gap-2 group"
+            >
+              <span>Let&apos;s build together</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            <button
+              onClick={() => scrollToSection('work')}
+              className="px-6 py-3 bg-white hover:bg-[#FAF7F2] text-[#141618] border border-[#D5CEBF] text-xs sm:text-sm font-semibold rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-2"
+            >
+              <span>See the work</span>
+              <ArrowDown className="w-4 h-4" />
+            </button>
+          </motion.div>
+
+          {/* Proof Badges Strip */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.25 }}
+            className="mt-12 pt-6 border-t border-[#D5CEBF]/60 flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs font-mono"
+          >
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#D5CEBF] shadow-xs text-[#141618]">
+              <Award className="w-3.5 h-3.5 text-[#3062F7]" />
+              <span className="font-bold">1st Runner Up (14 teams)</span>
+              <span className="text-[#71717A]">· UNILAG SERVICOM</span>
             </div>
 
-            <div className="flex-1 bg-[#0E1212] border border-white/[0.06] border-l-2 border-l-[#14B8A6] px-5 py-4">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">
-                5<span className="text-[#14B8A6] text-xl ml-0.5">+</span>
-              </div>
-              <div className="text-[11px] font-mono-num tracking-wider text-[#7A8583] mt-1">
-                PROJECTS COMPLETED
-              </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#D5CEBF] shadow-xs text-[#141618]">
+              <Sparkles className="w-3.5 h-3.5 text-[#F4BE24]" />
+              <span className="font-bold">Honourable Mention</span>
+              <span className="text-[#71717A]">· BuildVerse Hackathon</span>
             </div>
 
-            <div className="flex-1 bg-[#0E1212] border border-white/[0.06] border-l-2 border-l-[#14B8A6] px-5 py-4">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">
-                3<span className="text-[#14B8A6] text-xl ml-0.5">+</span>
-              </div>
-              <div className="text-[11px] font-mono-num tracking-wider text-[#7A8583] mt-1">
-                HAPPY CLIENTS
-              </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#D5CEBF] shadow-xs text-[#141618]">
+              <Zap className="w-3.5 h-3.5 text-[#2FA06A]" />
+              <span className="font-bold">10+ Hackathons Shipped</span>
+              <span className="text-[#71717A]">· Rapid AI Prototyping</span>
             </div>
           </motion.div>
-        </div>
+        </section>
 
-        {/* Bottom 4-Pillar Interactive Strip */}
-        <div className="mt-24 lg:mt-32 pt-6 border-t border-white/[0.06]">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {HERO_PILLARS.map((pillar, idx) => {
-              const isActive = activeHeroPillar === idx;
-              return (
-                <button
-                  key={pillar.number}
-                  onClick={() => setActiveHeroPillar(idx)}
-                  className="text-left group py-3 relative focus:outline-none cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 text-xs">
-                    <span
-                      className={`font-mono-num transition-colors ${
-                        isActive ? 'text-[#14B8A6]' : 'text-[#596361] group-hover:text-[#14B8A6]'
-                      }`}
-                    >
-                      {pillar.number}
-                    </span>
-                    <span
-                      className={`font-medium transition-colors whitespace-nowrap ${
-                        isActive ? 'text-white' : 'text-[#8C9694] group-hover:text-white'
-                      }`}
-                    >
-                      {pillar.title}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#66706E] mt-1.5 line-clamp-1">
-                    {pillar.detail}
-                  </p>
-                  <div className="mt-3 h-[2px] w-full bg-white/[0.05] overflow-hidden">
-                    <div
-                      className={`h-full bg-[#14B8A6] transition-transform duration-200 origin-left ${
-                        isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50'
-                      }`}
-                    />
-                  </div>
-                </button>
-              );
-            })}
+        {/* =====================================================================
+            3. SELECTED WORK — EDITORIAL STUDIO-BOARD CARDS WITH BREAKOUT MOCKUPS
+           ===================================================================== */}
+        <section id="work" className="py-16 sm:py-24 px-4 sm:px-6 max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <div className="flex items-center justify-center gap-2 text-3xl sm:text-5xl font-serif font-black text-[#141618] tracking-tight mb-2">
+              <span>Selected Works</span>
+              <span className="text-2xl sm:text-3xl font-normal text-[#C2410C]">↗</span>
+            </div>
+
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#EAE4D7] rounded-full text-xs font-mono font-semibold text-[#52525B]">
+              <span>{PROJECTS.length} BUILDS &amp; CASE STUDIES</span>
+              <span>·</span>
+              <span>EDITORIAL STUDIO DECK</span>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
+              <button
+                onClick={() => setActiveProjectFilter('ALL')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  activeProjectFilter === 'ALL'
+                    ? 'bg-[#141618] text-white shadow-xs'
+                    : 'bg-white text-[#52525B] hover:text-[#141618] border border-[#D5CEBF]'
+                }`}
+              >
+                All Projects ({PROJECTS.length})
+              </button>
+              <button
+                onClick={() => setActiveProjectFilter('SHIPPED_AI')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  activeProjectFilter === 'SHIPPED_AI'
+                    ? 'bg-[#C2410C] text-white shadow-xs'
+                    : 'bg-white text-[#52525B] hover:text-[#141618] border border-[#D5CEBF]'
+                }`}
+              >
+                ⚡ Shipped AI Builds (5)
+              </button>
+              <button
+                onClick={() => setActiveProjectFilter('CASE_STUDY')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  activeProjectFilter === 'CASE_STUDY'
+                    ? 'bg-[#2FA06A] text-white shadow-xs'
+                    : 'bg-white text-[#52525B] hover:text-[#141618] border border-[#D5CEBF]'
+                }`}
+              >
+                📐 Product Case Studies (5)
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
 
-      {/* =====================================================================
-          TEAL MARQUEE TICKER RIBBON
-         ===================================================================== */}
-      <div className="w-full bg-[#0E857D] text-[#041715] py-3 overflow-hidden border-y border-[#14B8A6]/30 select-none">
-        <div className="animate-marquee flex items-center">
-          {[...Array(2)].map((_, groupIndex) => (
-            <div key={groupIndex} className="flex items-center shrink-0">
-              {MARQUEE_ITEMS.map((item, idx) => (
-                <div key={`${groupIndex}-${idx}`} className="flex items-center shrink-0">
-                  <span className="text-[11px] font-mono-num font-medium tracking-[0.2em] px-6 text-white/95 whitespace-nowrap">
-                    {item}
-                  </span>
-                  <span className="text-white/40 text-xs" aria-hidden="true">
-                    ·
-                  </span>
+          {/* Editorial Cards Deck with Breakout Mockups */}
+          <div className="space-y-16 sm:space-y-24">
+            {filteredProjects.map((project, idx) => (
+              <EditorialProjectCard
+                key={project.id}
+                project={project}
+                index={idx}
+                onOpenCaseStudy={openProject}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* =====================================================================
+            4. "WHAT I WORK ON" (Capabilities)
+           ===================================================================== */}
+        <section id="capabilities" className="py-20 px-4 sm:px-6 max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-[#141618] tracking-tight mb-2">
+              What I work on
+            </h2>
+            <p className="text-xs sm:text-sm text-[#71717A] max-w-lg mx-auto">
+              I partner with founders, engineering leads, and product teams across the full lifecycle from early problem framing to functional code.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {CAPABILITIES.map((cap) => (
+              <motion.div
+                key={cap.id}
+                whileHover={{ y: -2 }}
+                className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-xs hover:shadow-md transition-all flex flex-col md:flex-row md:items-start justify-between gap-6"
+              >
+                <div className="flex items-start gap-4 flex-1">
+                  <span className="text-3xl select-none">{cap.emoji}</span>
+                  <div>
+                    <h3 className="font-display font-bold text-xl text-[#141618] mb-1">
+                      {cap.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#52525B] leading-relaxed mb-3">
+                      {cap.summary}
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {cap.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2.5 py-0.5 bg-[#FAF7F2] text-[#52525B] text-[11px] font-mono rounded-md border border-[#E0D9CC]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="md:w-64 shrink-0 border-t md:border-t-0 md:border-l border-[#F0EBE1] pt-3 md:pt-0 md:pl-6 space-y-1.5 text-xs text-[#71717A]">
+                  <div className="font-mono font-bold text-[10px] text-[#141618] tracking-wider uppercase mb-1">
+                    Deliverables:
+                  </div>
+                  {cap.outcomes.map((out, i) => (
+                    <div key={i} className="flex items-start gap-1.5">
+                      <span className="text-[#2FA06A] font-bold">✓</span>
+                      <span>{out}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* =====================================================================
+            5. DEDICATED "ABOUT" SECTION — WHO I AM, BEYOND WORK & PHOTO BOOK
+           ===================================================================== */}
+        <section id="about" className="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+          {/* Section Kicker & Title */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#FAF7F2] border border-[#D5CEBF] rounded-full text-xs font-mono font-bold text-[#EE5828] mb-3 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-[#EE5828]" />
+              <span>THE PERSON BEHIND THE WORK</span>
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-[#141618] tracking-tight mb-3">
+              About me &amp; my journey
+            </h2>
+            <p className="text-sm sm:text-base text-[#52525B] max-w-2xl mx-auto leading-relaxed">
+              Product Designer, Product Engineer, founder of Forge Academy, and hackathon competitor. I design products with deep user empathy and ship them directly in code.
+            </p>
+          </div>
+
+          {/* Part A: Personal Story & Narrative Bento */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-16">
+            {/* Left Narrative Box */}
+            <div className="md:col-span-7 bg-white rounded-3xl border-2 border-[#141618] p-6 sm:p-8 shadow-[6px_6px_0px_#141618] space-y-4">
+              <div className="flex items-center justify-between border-b border-[#F0EBE1] pb-3 text-xs font-mono text-[#71717A]">
+                <span className="font-bold text-[#141618]">A. Introduction · Who I Am</span>
+                <span>Lagos, NG · UNILAG</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-display font-bold text-[#141618] tracking-tight">
+                Designing with intention, engineering with speed, and teaching in the open.
+              </h3>
+
+              <div className="space-y-3 text-xs sm:text-sm text-[#3F3F46] font-sans leading-relaxed">
+                <p>
+                  I’m <strong className="text-[#141618]">Opeyemi (The UX Forger)</strong>. As a Product Designer and Design Engineer studying Industrial Mathematics at the University of Lagos, I approach digital experiences through a dual lens: mathematical system modeling and human behavioral empathy.
+                </p>
+                <p>
+                  I believe the gap between design and engineering is where great products are won or lost. Instead of handing off static rectangles and hoping for the best, I prototype directly in code, test edge cases with real data, and deploy functional MVPs under hackathon constraints.
+                </p>
+                <p>
+                  Beyond personal building, I founded <strong className="text-[#141618]">Forge Academy</strong>—a hands-on design and tech academy where I mentor cohorts of ambitious young creators through real product teardowns, design systems, and modern AI acceleration.
+                </p>
+              </div>
+
+              {/* Personal Proof Metrics */}
+              <div className="pt-4 border-t border-[#F0EBE1] grid grid-cols-3 gap-2 text-center">
+                <div className="p-2.5 rounded-xl bg-[#FAF7F2] border border-[#EFE9DC]">
+                  <div className="font-display font-black text-lg sm:text-xl text-[#3062F7]">2x</div>
+                  <div className="text-[10px] font-mono text-[#71717A] uppercase font-bold">Award Winner</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#FAF7F2] border border-[#EFE9DC]">
+                  <div className="font-display font-black text-lg sm:text-xl text-[#2FA06A]">10+</div>
+                  <div className="text-[10px] font-mono text-[#71717A] uppercase font-bold">Hackathons Shipped</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#FAF7F2] border border-[#EFE9DC]">
+                  <div className="font-display font-black text-lg sm:text-xl text-[#EE5828]">10+</div>
+                  <div className="text-[10px] font-mono text-[#71717A] uppercase font-bold">Students Mentored</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Philosophy & Math Background Bento */}
+            <div className="md:col-span-5 flex flex-col justify-between gap-4">
+              <div className="bg-[#FAF7F2] rounded-3xl border-2 border-[#141618] p-6 shadow-[6px_6px_0px_#141618] flex-1 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="text-xs font-mono font-bold text-[#EE5828] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>⚡</span>
+                    <span>The Philosophy</span>
+                  </div>
+                  <blockquote className="text-base sm:text-lg font-serif italic text-[#141618] leading-snug">
+                    &ldquo;I design products and I ship them. The best way to understand constraints is to build inside them.&rdquo;
+                  </blockquote>
+                  <p className="text-xs text-[#52525B] font-sans">
+                    Every interface is a hypothesis until a real user clicks, hesitates, or completes their goal.
+                  </p>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-[#D5CEBF] flex items-center justify-between text-xs font-mono text-[#71717A]">
+                  <span>Founder · Forge Academy</span>
+                  <a
+                    href="#experience"
+                    className="text-[#141618] font-bold hover:underline underline-offset-4 flex items-center gap-1"
+                  >
+                    <span>Career Bricks</span>
+                    <span>↓</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* UNILAG Math Connection */}
+              <div className="bg-white rounded-2xl border-2 border-[#141618] p-4 shadow-[4px_4px_0px_#141618] flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#3062F7]/10 border border-[#3062F7]/30 flex items-center justify-center text-[#3062F7] text-lg shrink-0 font-mono font-bold">
+                  ∫dx
+                </div>
+                <div>
+                  <div className="font-display font-bold text-xs text-[#141618]">
+                    Industrial Mathematics @ UNILAG
+                  </div>
+                  <div className="text-[11px] font-mono text-[#71717A]">
+                    Applying algorithms, systems thinking &amp; logic to UI architecture.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Part B: Beyond Work (Personal Interests) */}
+          <div className="mb-16">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-6">
+              <div>
+                <div className="text-xs font-mono font-bold text-[#EE5828] uppercase tracking-wider mb-1">
+                  B. Beyond the Screen
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-[#141618] tracking-tight">
+                  Life off the keyboard
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-[#71717A] max-w-sm">
+                Interests that keep my mind curious, grounded, and refreshed.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {BEYOND_WORK_ITEMS.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border-2 border-[#141618] p-5 shadow-[4px_4px_0px_#141618] bg-white flex flex-col justify-between hover:-translate-y-1 hover:shadow-[5px_5px_0px_#141618] transition-all"
+                >
+                  <div className="space-y-2.5">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl border border-black/10"
+                      style={{ backgroundColor: item.bgTint }}
+                    >
+                      <span>{item.emoji}</span>
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-base text-[#141618] leading-tight">
+                        {item.title}
+                      </h4>
+                      <div className="text-[11px] font-mono font-semibold text-[#71717A] mt-0.5">
+                        {item.tagline}
+                      </div>
+                    </div>
+                    <p className="text-xs text-[#52525B] leading-relaxed font-sans">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  <div
+                    className="pt-3 mt-3 border-t border-[#F0EBE1] flex items-center gap-1.5 text-[10px] font-mono font-bold"
+                    style={{ color: item.color }}
+                  >
+                    <span>●</span>
+                    <span className="uppercase">Personal Pursuit</span>
+                  </div>
                 </div>
               ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* =====================================================================
-          SELECTED WORK ("Projects that matter")
-         ===================================================================== */}
-      <section id="work" className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
-          <div>
-            <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-              <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-              <span>SELECTED WORK</span>
+          {/* Part C: The Interactive Photo Book ("The Person Behind the Work") */}
+          <div className="pt-4">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141618] text-white text-xs font-mono font-bold mb-2">
+                <span>📖</span>
+                <span>C. My Journey · Interactive Photo Book</span>
+              </div>
+              <h3 className="text-2xl sm:text-4xl font-display font-extrabold text-[#141618] tracking-tight">
+                Flip through memorable moments
+              </h3>
+              <p className="text-xs sm:text-sm text-[#71717A] max-w-lg mx-auto mt-1">
+                An interactive physical book documenting milestones, stage presentations, cohort workshops, and stories along the way. Click the cover to open and explore.
+              </p>
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-              Projects that
-              <span className="block italic font-normal text-[#139E93]">matter</span>
-            </h2>
+
+            {/* The Photo Book Component */}
+            <InteractivePhotoBook />
           </div>
 
-          {/* Interactive Category Filter Controls (Functional Buttons) */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#0E1212] border border-white/[0.07]">
-            {(['All', 'Mobile App', 'Web & AI', 'Fintech', 'Game Design'] as const).map(
-              (category) => (
-                <button
-                  key={category}
-                  onClick={() => setProjectFilter(category)}
-                  className={`px-3.5 py-2 text-xs font-mono-num transition-colors duration-150 cursor-pointer whitespace-nowrap ${
-                    projectFilter === category
-                      ? 'bg-[#118A82] text-white font-medium'
-                      : 'text-[#8C9694] hover:text-white'
-                  }`}
-                >
-                  {category}
-                </button>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* 2x2 Project Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {filteredGridProjects.map((project) => (
-            <motion.article
-              key={project.id}
-              layout
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              onClick={() => setSelectedProject(project)}
-              className="group bg-[#0D1010] border border-white/[0.07] hover:border-[#14B8A6]/50 transition-colors duration-200 cursor-pointer flex flex-col overflow-hidden"
-            >
-              {/* Top Gradient & Wireframe Canvas matching screenshot */}
-              <div
-                className="relative h-64 sm:h-72 w-full p-7 flex flex-col justify-between overflow-hidden"
-                style={{
-                  background: `linear-gradient(135deg, ${project.gradientFrom} 0%, ${project.gradientVia} 55%, ${project.gradientTo} 100%)`,
-                }}
-              >
-                {/* Abstract UI Wireframe Bars */}
-                <div className="space-y-3 max-w-xs transition-transform duration-200 group-hover:translate-x-1">
-                  <div
-                    className="h-1.5 w-36 rounded-full opacity-80"
-                    style={{ backgroundColor: project.accentLineColor }}
-                  />
-                  <div className="h-1.5 w-64 rounded-full bg-white/20" />
-                  <div className="h-1.5 w-48 rounded-full bg-white/15" />
+          {/* Contextual Jump Link to Experience Bricks */}
+          <div className="mt-12 p-4 rounded-2xl bg-[#EFE9DC] border-2 border-[#141618] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🧱</span>
+              <div>
+                <div className="font-display font-bold text-xs sm:text-sm text-[#141618]">
+                  Looking for my formal employment history &amp; company contributions?
                 </div>
-
-                {/* Hover inspect cue + Bottom-Right Monogram */}
-                <div className="flex items-end justify-between mt-auto">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-mono-num tracking-wider text-white/75 group-hover:text-white transition-colors">
-                    <span>VIEW CASE STUDY</span>
-                    <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </span>
-
-                  <span className="font-display text-6xl sm:text-7xl font-bold text-white/15 group-hover:text-white/25 transition-colors select-none leading-none">
-                    {project.monogram}
-                  </span>
+                <div className="text-[11px] font-mono text-[#71717A]">
+                  Explore the 3D career brick stack below featuring EcoVest, Forge Academy, Ventics AI &amp; more.
                 </div>
               </div>
+            </div>
+            <a
+              href="#experience"
+              className="px-4 py-2 rounded-xl bg-[#141618] text-white font-mono font-bold text-xs hover:bg-[#27272A] transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <span>Explore Career Bricks</span>
+              <span>↓</span>
+            </a>
+          </div>
+        </section>
 
-              {/* Card Content Footer (Clean unboxed metadata with middle-dot separators) */}
-              <div className="p-6 sm:p-7 bg-[#0E1212] flex-1 flex flex-col justify-between">
+        {/* =====================================================================
+            6. "WHERE I'VE BEEN" (Interactive 3D Lego Bricks)
+           ===================================================================== */}
+        <section id="experience" className="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-5xl font-display font-extrabold text-[#141618] tracking-tight mb-2">
+              Where I&apos;ve been
+            </h2>
+            <p className="text-xs sm:text-sm text-[#71717A] max-w-md mx-auto">
+              Interactive career brick stack. Click any brick to reveal my role, timeline, and key contributions.
+            </p>
+          </div>
+
+          <CompanyBricks />
+        </section>
+
+        {/* =====================================================================
+            6. "WORD OF MOUTH" — HORIZONTAL SNAP CAROUSEL (Option 1)
+           ===================================================================== */}
+        <section id="testimonials" className="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+          <TestimonialCarousel />
+        </section>
+
+        {/* =====================================================================
+            7. "PLAYGROUND" (Clear Intro, Status Badges & Interactive Toys)
+           ===================================================================== */}
+        <section id="playground" className="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <div className="flex items-center justify-center gap-2 text-2xl sm:text-4xl font-display font-extrabold text-[#141618] tracking-tight mb-2">
+              <span>🕹️</span>
+              <span>Playground &amp; Lab</span>
+            </div>
+            <p className="text-xs sm:text-sm text-[#52525B] max-w-xl mx-auto leading-relaxed">
+              A dedicated workshop for creative engineering, micro-interaction physics, design tokens, and functional prototypes. Built to test ideas in the open and share tools with the builder community.
+            </p>
+          </div>
+
+          {/* Experiment Cards with Status Badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
+            {EXPERIMENTS.map((exp) => (
+              <motion.div
+                key={exp.id}
+                whileHover={{ y: -4 }}
+                className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+              >
                 <div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono-num tracking-wider text-[#14B8A6] mb-2.5">
-                    {project.categories.map((cat, idx) => (
-                      <React.Fragment key={cat}>
-                        <span>{cat}</span>
-                        {idx < project.categories.length - 1 && (
-                          <span aria-hidden="true" className="text-white/25">
-                            ·
-                          </span>
-                        )}
-                      </React.Fragment>
+                  <div className="flex items-center justify-between mb-3">
+                    <span
+                      className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full text-white"
+                      style={{ backgroundColor: exp.color }}
+                    >
+                      {exp.status}
+                    </span>
+                    <span className="text-xs font-mono text-[#71717A]">{exp.duration}</span>
+                  </div>
+
+                  <h3 className="font-display font-bold text-xl text-[#141618] mb-1">
+                    {exp.title}
+                  </h3>
+                  <p className="text-xs text-[#52525B] leading-relaxed mb-3">
+                    {exp.description}
+                  </p>
+
+                  {/* What it is, does, why */}
+                  <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EAE4D7] space-y-1.5 text-[11px] font-mono text-[#52525B] mb-3">
+                    <div>
+                      <strong className="text-[#141618]">What:</strong> {exp.whatItIs}
+                    </div>
+                    <div>
+                      <strong className="text-[#141618]">Why:</strong> {exp.whyItExists}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {exp.stack.map((s) => (
+                      <span
+                        key={s}
+                        className="px-2 py-0.5 bg-[#F0EBE1] text-[10px] font-mono text-[#52525B] rounded"
+                      >
+                        {s}
+                      </span>
                     ))}
                   </div>
-
-                  <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white group-hover:text-[#2DD4BF] transition-colors mb-2">
-                    {project.title}
-                  </h3>
-
-                  <p className="text-xs sm:text-sm text-[#8C9694] leading-relaxed">
-                    {project.shortDescription}
-                  </p>
                 </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
 
-        {/* Full-Width Featured Project Card (Ventics AI) */}
-        {projectFilter === 'All' && featuredProject && (
-          <motion.article
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-40px' }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            onClick={() => setSelectedProject(featuredProject)}
-            className="mt-5 group bg-[#0E1212] border border-white/[0.07] hover:border-[#14B8A6]/50 transition-colors duration-200 cursor-pointer grid grid-cols-1 lg:grid-cols-12 overflow-hidden"
-          >
-            {/* Left Description Column */}
-            <div className="lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-center">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono-num tracking-wider text-[#14B8A6] mb-3">
-                {featuredProject.categories.map((cat, idx) => (
-                  <React.Fragment key={cat}>
-                    <span className={cat === 'Featured' ? 'text-[#F59E0B]' : ''}>{cat}</span>
-                    {idx < featuredProject.categories.length - 1 && (
-                      <span aria-hidden="true" className="text-white/25">
-                        ·
-                      </span>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              <h3 className="font-display text-3xl sm:text-4xl lg:text-5xl font-semibold text-white group-hover:text-[#2DD4BF] transition-colors mb-4">
-                {featuredProject.title}
-              </h3>
-
-              <p className="text-xs sm:text-sm text-[#8C9694] leading-relaxed max-w-lg mb-6">
-                {featuredProject.shortDescription}
-              </p>
-
-              <div className="inline-flex items-center gap-2 text-xs font-mono-num tracking-wider text-[#14B8A6] group-hover:text-[#2DD4BF]">
-                <span>EXPLORE CASE STUDY</span>
-                <ArrowUpRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </div>
-            </div>
-
-            {/* Right Amber Gradient Canvas */}
-            <div
-              className="lg:col-span-6 min-h-[240px] sm:min-h-[280px] p-7 sm:p-10 flex flex-col justify-between relative overflow-hidden"
-              style={{
-                background: `linear-gradient(135deg, ${featuredProject.gradientFrom} 0%, ${featuredProject.gradientVia} 52%, ${featuredProject.gradientTo} 100%)`,
-              }}
-            >
-              <div className="space-y-3 max-w-xs transition-transform duration-200 group-hover:translate-x-1">
-                <div
-                  className="h-1.5 w-36 rounded-full opacity-85"
-                  style={{ backgroundColor: featuredProject.accentLineColor }}
-                />
-                <div className="h-1.5 w-64 rounded-full bg-white/25" />
-                <div className="h-1.5 w-48 rounded-full bg-white/15" />
-              </div>
-
-              <div className="flex justify-end mt-auto">
-                <span className="font-display text-6xl sm:text-7xl font-bold text-white/20 select-none leading-none">
-                  {featuredProject.monogram}
-                </span>
-              </div>
-            </div>
-          </motion.article>
-        )}
-
-        {/* 4-Column Quantitative Proof Strip directly below Selected Work */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-[#0E1212] border border-white/[0.07] divide-y sm:divide-y-0 sm:divide-x divide-white/[0.07]">
-          {STATS_STRIP.map((stat) => (
-            <div key={stat.label} className="p-8 sm:p-10 text-center">
-              <div className="font-display text-4xl sm:text-5xl font-bold text-white font-mono-num mb-2">
-                {stat.value}
-                {stat.suffix && <span className="text-[#14B8A6] text-3xl ml-0.5">{stat.suffix}</span>}
-              </div>
-              <div className="text-[11px] font-mono-num tracking-widest text-[#7A8583] mb-2">
-                {stat.label}
-              </div>
-              <p className="text-xs text-[#646E6C] max-w-[210px] mx-auto leading-relaxed">
-                {stat.subtext}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* =====================================================================
-          CAREER / EXPERIENCE ("Where I've worked")
-         ===================================================================== */}
-      <section
-        id="experience"
-        className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]"
-      >
-        <div className="mb-16">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>CAREER</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            Where I&apos;ve
-            <span className="block italic font-normal text-[#139E93]">worked</span>
-          </h2>
-        </div>
-
-        <div className="divide-y divide-white/[0.07] border-t border-b border-white/[0.07]">
-          {EXPERIENCES.map((exp) => (
-            <motion.div
-              key={exp.id}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-30px' }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="py-10 lg:py-12 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start group"
-            >
-              {/* Date Range */}
-              <div className="lg:col-span-3 text-xs font-mono-num tracking-wider text-[#7A8583]">
-                {exp.period}
-              </div>
-
-              {/* Role, Company, Description & Unboxed Skills */}
-              <div className="lg:col-span-7">
-                <div className="text-[11px] font-mono-num tracking-widest text-[#14B8A6] mb-1.5">
-                  {exp.company}
-                </div>
-                <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white group-hover:text-[#2DD4BF] transition-colors mb-3">
-                  {exp.role}
-                </h3>
-                <p className="text-xs sm:text-sm text-[#8C9694] leading-relaxed mb-5 max-w-2xl">
-                  {exp.description}
-                </p>
-
-                {/* Clean unboxed skill metadata with typographic separators */}
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[11px] font-mono-num tracking-wider text-[#6E7876]">
-                  {exp.skills.map((skill, index) => (
-                    <React.Fragment key={skill}>
-                      <span className="text-[#9BA5A3]">{skill}</span>
-                      {index < exp.skills.length - 1 && (
-                        <span aria-hidden="true" className="text-[#14B8A6]/60">
-                          ·
-                        </span>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right Employment Type */}
-              <div className="lg:col-span-2 lg:text-right">
-                <span className="text-[11px] font-mono-num tracking-widest text-[#8C9694]">
-                  {exp.employmentType}
-                </span>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* =====================================================================
-          SERVICES ("Services built around your needs")
-         ===================================================================== */}
-      <section
-        id="services"
-        className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]"
-      >
-        <div className="mb-14">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>WHAT I OFFER</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            Services built
-            <span className="block">
-              around your <span className="italic font-normal text-[#139E93]">needs</span>
-            </span>
-          </h2>
-        </div>
-
-        {/* Interactive Accordion List */}
-        <div className="border-t border-white/[0.08]">
-          {SERVICES.map((service) => {
-            const isOpen = openServiceId === service.id;
-            return (
-              <div key={service.id} className="border-b border-white/[0.08]">
-                <button
-                  onClick={() => setOpenServiceId(isOpen ? '' : service.id)}
-                  className="w-full py-7 flex items-center justify-between text-left group cursor-pointer focus:outline-none"
-                >
-                  <div className="flex items-baseline gap-6 sm:gap-10">
-                    <span className="text-xs font-mono-num text-[#14B8A6]">{service.number}</span>
-                    <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white group-hover:text-[#2DD4BF] transition-colors">
-                      {service.title}
-                    </h3>
-                  </div>
-
-                  <span className="text-[#14B8A6] transition-transform duration-200">
-                    {isOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  </span>
-                </button>
-
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.18 }}
-                      className="pb-9 pl-10 sm:pl-16 pr-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
+                {exp.liveUrl && (
+                  <div className="pt-3 border-t border-[#F0EBE1] flex justify-end">
+                    <a
+                      href={exp.liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#3062F7] hover:underline"
                     >
-                      <p className="lg:col-span-6 text-xs sm:text-sm text-[#8C9694] leading-relaxed max-w-md">
-                        {service.description}
-                      </p>
-
-                      <ul className="lg:col-span-6 space-y-2.5 text-xs font-mono-num tracking-wider text-[#9BA5A3]">
-                        {service.deliverables.map((item) => (
-                          <li key={item} className="flex items-center gap-3">
-                            <span className="text-[#14B8A6]">—</span>
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* =====================================================================
-          DESIGN PROCESS ("My design process")
-         ===================================================================== */}
-      <section className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]">
-        <div className="mb-14">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>HOW I WORK</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            My design
-            <span className="block italic font-normal text-[#139E93]">process</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-[#0E1212] border border-white/[0.07] divide-y sm:divide-y-0 sm:divide-x divide-white/[0.07]">
-          {PROCESS_STEPS.map((step) => (
-            <div
-              key={step.number}
-              className="p-7 sm:p-9 hover:bg-white/[0.015] transition-colors flex flex-col justify-between"
-            >
-              <div>
-                <div className="font-display text-4xl font-semibold text-[#134E4A] font-mono-num mb-5">
-                  {step.number}
-                </div>
-                <h3 className="font-display text-xl sm:text-2xl font-semibold text-white mb-3">
-                  {step.title}
-                </h3>
-                <p className="text-xs text-[#8C9694] leading-relaxed">{step.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* =====================================================================
-          ABOUT ME ("The person behind the forge")
-         ===================================================================== */}
-      <section
-        id="about"
-        className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
-          {/* Left Bio & Interactive Stack Column */}
-          <div className="lg:col-span-6">
-            <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-              <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-              <span>ABOUT ME</span>
-            </div>
-            <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight mb-8">
-              The person
-              <span className="block">
-                behind the <span className="italic font-normal text-[#139E93]">forge</span>
-              </span>
-            </h2>
-
-            <div className="space-y-5 text-xs sm:text-sm text-[#8C9694] leading-relaxed max-w-xl">
-              <p>
-                I&apos;m <strong className="text-white font-semibold">Owoade Opeyemi</strong> — a
-                UI/UX and Product Designer based in Lagos, Nigeria, operating under the brand{' '}
-                <strong className="text-white font-semibold">The UX Forger</strong>. I design
-                interfaces that feel as good as they look.
-              </p>
-              <p>
-                Alongside design, I&apos;m a{' '}
-                <strong className="text-white font-semibold">
-                  Mathematics student at the University of Lagos
-                </strong>{' '}
-                — which means I think in systems, logic, and patterns. That analytical mindset flows
-                into every product I touch.
-              </p>
-              <p>
-                I also <strong className="text-white font-semibold">teach UI/UX design</strong> to
-                aspiring designers breaking into the field — because good design thinking should be
-                accessible to everyone willing to learn it.
-              </p>
-            </div>
-
-            {/* Interactive Stack Filter / Highlight Buttons */}
-            <div className="mt-10">
-              <div className="text-[11px] font-mono-num tracking-widest text-[#646E6C] mb-3.5">
-                MY STACK
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {STACK_ITEMS.map((skill) => {
-                  const isSelected = activeStackSkill === skill;
-                  return (
-                    <button
-                      key={skill}
-                      onClick={() => setActiveStackSkill(isSelected ? null : skill)}
-                      className={`px-3.5 py-2 text-xs font-mono-num border transition-colors duration-150 cursor-pointer whitespace-nowrap ${
-                        isSelected
-                          ? 'bg-[#118A82] text-white border-[#14B8A6]'
-                          : 'bg-[#0E1212] text-[#9BA5A3] border-white/[0.08] hover:border-[#14B8A6]/50 hover:text-white'
-                      }`}
-                    >
-                      {skill}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Center Portrait Column */}
-          <div className="lg:col-span-4 relative">
-            <div className="relative bg-[#141818] border border-white/10 overflow-hidden aspect-[3/4]">
-              {!portraitError ? (
-                <img
-                  src={portraitImg}
-                  alt="Owoade Opeyemi — The UX Forger portrait in a tailored suit"
-                  referrerPolicy="no-referrer"
-                  onError={() => setPortraitError(true)}
-                  className="w-full h-full object-cover object-top"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-[#0D2E2C] to-[#091313] text-center">
-                  <span className="font-display text-5xl font-bold text-[#14B8A6] mb-2">OO</span>
-                  <span className="text-sm text-white font-medium">Owoade Opeyemi</span>
-                  <span className="text-xs text-[#8C9694] mt-1">The UX Forger</span>
-                </div>
-              )}
-            </div>
-
-            {/* Gold Signature Label matching screenshot */}
-            <div className="inline-block bg-[#F59E0B] text-[#080909] font-mono-num text-[11px] font-semibold tracking-widest px-4 py-2 -mt-4 relative z-10 shadow-md">
-              THE UX FORGER
-            </div>
-          </div>
-
-          {/* Right Vertical Stat Column */}
-          <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-1 gap-3.5">
-            <div className="bg-[#0E1212] border border-white/[0.07] p-5">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">2</div>
-              <div className="text-[11px] text-[#7A8583] mt-1">Years designing</div>
-            </div>
-            <div className="bg-[#0E1212] border border-white/[0.07] p-5">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">5</div>
-              <div className="text-[11px] text-[#7A8583] mt-1">Projects done</div>
-            </div>
-            <div className="bg-[#0E1212] border border-white/[0.07] p-5">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">3</div>
-              <div className="text-[11px] text-[#7A8583] mt-1">Happy clients</div>
-            </div>
-            <div className="bg-[#0E1212] border border-white/[0.07] p-5">
-              <div className="font-display text-3xl font-bold text-white font-mono-num">∞</div>
-              <div className="text-[11px] text-[#7A8583] mt-1">Ideas cooking</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================================
-          SOCIAL PROOF ("What clients say")
-         ===================================================================== */}
-      <section className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]">
-        <div className="mb-14">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>SOCIAL PROOF</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            What clients
-            <span className="block italic font-normal text-[#139E93]">say</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {testimonials.map((item) => (
-            <div
-              key={item.id}
-              className="bg-[#0E1212] border border-white/[0.07] p-8 flex flex-col justify-between"
-            >
-              <p className="font-display italic text-lg sm:text-xl text-[#D0D8D6] leading-relaxed mb-8">
-                {item.quote}
-              </p>
-              <div>
-                <div className="text-xs font-mono-num font-semibold tracking-wider text-white">
-                  {item.author}
-                </div>
-                <div className="text-[11px] font-mono-num text-[#687370] mt-0.5">{item.role}</div>
-              </div>
-            </div>
-          ))}
-
-          {/* Interactive 3rd Card: "YOUR TESTIMONIAL HERE" */}
-          <button
-            onClick={() => setIsTestimonialModalOpen(true)}
-            className="bg-[#0E1212]/60 hover:bg-[#0E1212] border border-dashed border-white/10 hover:border-[#14B8A6]/50 p-8 flex flex-col items-center justify-center text-center min-h-[220px] transition-colors cursor-pointer group"
-          >
-            <Plus className="w-5 h-5 text-[#687370] group-hover:text-[#14B8A6] mb-3 transition-colors" />
-            <div className="text-xs font-mono-num tracking-widest text-[#7A8583] group-hover:text-white transition-colors">
-              YOUR TESTIMONIAL HERE
-            </div>
-            <div className="text-xs text-[#596361] mt-1">Work with me and be featured</div>
-          </button>
-        </div>
-      </section>
-
-      {/* =====================================================================
-          BEYOND THE SCREENS ("What I do when I'm not designing")
-         ===================================================================== */}
-      <section className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]">
-        <div className="mb-14">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>BEYOND THE SCREENS</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            What I do when
-            <span className="block">
-              I&apos;m not <span className="italic font-normal text-[#139E93]">designing</span>
-            </span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="bg-[#0E1212] border border-white/[0.07] p-8 sm:p-10">
-            <div className="w-10 h-10 bg-white/[0.04] border border-white/10 flex items-center justify-center text-[#14B8A6] mb-5">
-              <Gamepad2 className="w-5 h-5" />
-            </div>
-            <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white mb-3">
-              Gaming
-            </h3>
-            <p className="text-xs sm:text-sm text-[#8C9694] leading-relaxed max-w-lg">
-              I play games seriously — and it&apos;s not unrelated to design. Games are the most
-              complex UX systems that exist. Understanding them makes me a sharper, more intuitive
-              designer.
-            </p>
-          </div>
-
-          <div className="bg-[#0E1212] border border-white/[0.07] p-8 sm:p-10">
-            <div className="w-10 h-10 bg-white/[0.04] border border-white/10 flex items-center justify-center text-[#F59E0B] mb-5">
-              <UtensilsCrossed className="w-5 h-5" />
-            </div>
-            <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white mb-3">
-              Cooking
-            </h3>
-            <p className="text-xs sm:text-sm text-[#8C9694] leading-relaxed max-w-lg">
-              Cooking and design have more in common than you&apos;d think — both are about
-              combining the right ingredients with intention, timing, and taste. I take both very
-              seriously.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================================
-          PRICING ("Clear, upfront pricing")
-         ===================================================================== */}
-      <section
-        id="pricing"
-        className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]"
-      >
-        <div className="mb-14">
-          <div className="flex items-center gap-3 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-3">
-            <span className="w-5 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>PRICING</span>
-          </div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight">
-            Clear, upfront
-            <span className="block italic font-normal text-[#139E93]">pricing</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          {PRICING_TIERS.map((tier) => (
-            <div
-              key={tier.id}
-              className={`bg-[#0E1212] p-8 sm:p-10 flex flex-col justify-between border transition-colors ${
-                tier.popular
-                  ? 'border-[#14B8A6]/60 relative'
-                  : 'border-white/[0.07] hover:border-white/20'
-              }`}
-            >
-              <div>
-                {tier.popular && (
-                  <div className="text-[10px] font-mono-num tracking-widest text-[#14B8A6] pb-4 mb-6 border-b border-white/[0.08]">
-                    MOST POPULAR
+                      <span>Launch Prototype</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 )}
+              </motion.div>
+            ))}
+          </div>
 
-                <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white mb-2">
-                  {tier.name}
-                </h3>
-                <p className="text-xs text-[#8C9694] leading-relaxed mb-8">{tier.tagline}</p>
+          {/* Real Interactive Playground Toys */}
+          <PlaygroundInteractiveToys />
+        </section>
 
-                <div className="mb-8">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-display text-4xl sm:text-5xl font-bold text-white font-mono-num">
-                      {tier.price}
-                    </span>
-                    {tier.unit && (
-                      <span className="text-sm font-mono-num text-[#8C9694]">{tier.unit}</span>
-                    )}
-                  </div>
-                  <div className="text-[11px] font-mono-num text-[#687370] mt-1.5">
-                    {tier.billingNote}
-                  </div>
-                </div>
+        {/* =====================================================================
+            8. "ASK THE UX FORGER" — SMARTPHONE CONCIERGE (reference image 1)
+           ===================================================================== */}
+        <section className="py-20 px-4 sm:px-6 max-w-4xl mx-auto text-center">
+          <div className="mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FAF7F2] border border-[#D5CEBF] rounded-full text-xs font-mono text-[#52525B] mb-2 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-[#EE5828]" />
+              <span>STUDIO CONCIERGE</span>
+            </div>
+            <h3 className="font-display font-extrabold text-2xl sm:text-4xl text-[#141618] tracking-tight">
+              Ask The UX Forger
+            </h3>
+            <p className="text-xs sm:text-sm text-[#71717A] mt-1.5 max-w-md mx-auto">
+              Simulate an interactive conversation. Check availability, explore project decisions, or grab my verified CV.
+            </p>
+          </div>
 
-                <ul className="space-y-3 border-t border-white/[0.07] pt-6 mb-10 text-xs text-[#9BA5A3]">
-                  {tier.features.map((feat) => (
-                    <li key={feat} className="flex items-center gap-3">
-                      <span className="text-[#14B8A6] font-mono-num">—</span>
-                      <span>{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <InteractiveChatPhone
+            onOpenResumeModal={() => setIsResumeModalOpen(true)}
+            onOpenContactForm={() => scrollToSection('contact')}
+            onSelectProject={(slug) => {
+              const proj = PROJECTS.find((p) => p.slug === slug || p.id === slug);
+              if (proj) openProject(proj);
+            }}
+          />
+        </section>
 
+        {/* =====================================================================
+            9. CLOSING FOOTER SECTION (Inspired by reference image)
+           ===================================================================== */}
+        <footer id="contact" className="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+          {/* The Sunny Yellow Neo-Brutalist Card */}
+          <div className="relative bg-[#FFCC33] border-[3px] border-[#141618] rounded-[2.5rem] p-8 sm:p-14 lg:p-16 shadow-[8px_8px_0px_#141618] flex flex-col items-center justify-center text-center overflow-hidden">
+            {/* Pink Corner Sparkle Star (Top Left) */}
+            <div className="absolute top-5 left-5 sm:top-7 sm:left-7 -rotate-12 pointer-events-none select-none">
+              <svg viewBox="0 0 44 44" className="w-9 h-9 sm:w-11 sm:h-11" fill="none">
+                <path
+                  d="M22 2 C22 13, 29 20, 42 22 C29 24, 22 31, 22 42 C22 31, 15 24, 2 22 C15 20, 22 13, 22 2 Z"
+                  fill="#FF758F"
+                  stroke="#141618"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            {/* Mint Teal Corner Sparkle Star (Bottom Right) */}
+            <div className="absolute bottom-5 right-5 sm:bottom-7 sm:right-7 rotate-12 pointer-events-none select-none">
+              <svg viewBox="0 0 44 44" className="w-9 h-9 sm:w-11 sm:h-11" fill="none">
+                <path
+                  d="M22 2 C22 13, 29 20, 42 22 C29 24, 22 31, 22 42 C22 31, 15 24, 2 22 C15 20, 22 13, 22 2 Z"
+                  fill="#4FD1C5"
+                  stroke="#141618"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            {/* Casual Handwritten Kicker */}
+            <p className="font-serif italic text-lg sm:text-2xl text-[#141618] font-medium tracking-tight mb-2 select-none">
+              got an idea?
+            </p>
+
+            {/* Massive Bold Headline */}
+            <h2 className="font-display font-black text-4xl sm:text-6xl md:text-7xl text-[#141618] tracking-tight leading-[1.08] max-w-2xl mb-4">
+              Let&apos;s build something fun.
+            </h2>
+
+            {/* Email with Copy Icon & Signature Squiggly Wavy Underline */}
+            <div className="flex flex-col items-center justify-center my-4 group">
               <button
-                onClick={() => handleSelectPricing(tier.name, tier.price)}
-                className={`w-full py-3.5 text-xs font-mono-num tracking-widest transition-colors duration-150 cursor-pointer whitespace-nowrap ${
-                  tier.popular
-                    ? 'bg-[#0F8A82] hover:bg-[#14A399] text-white font-medium'
-                    : 'bg-transparent hover:bg-white/[0.05] text-[#9BA5A3] hover:text-white border border-white/10'
-                }`}
+                onClick={handleCopyEmail}
+                className="inline-flex items-center gap-2 font-mono text-xs sm:text-sm md:text-base font-bold text-[#141618] hover:opacity-85 transition-opacity cursor-pointer px-3 py-1 rounded-full hover:bg-black/5"
+                title="Click to copy email address"
               >
-                {tier.ctaText}
+                <span>uxforger@gmail.com</span>
+                {copiedEmail ? (
+                  <Check className="w-4 h-4 text-[#1E7B4F]" />
+                ) : (
+                  <Copy className="w-4 h-4 text-[#141618]" />
+                )}
+                {copiedEmail && (
+                  <span className="text-[10px] font-mono font-bold bg-[#141618] text-white px-2 py-0.5 rounded-full ml-1">
+                    Copied!
+                  </span>
+                )}
               </button>
+
+              {/* Decorative Wavy Squiggle Path directly beneath */}
+              <svg
+                className="w-44 sm:w-56 h-3.5 text-[#141618] mt-0.5 pointer-events-none"
+                viewBox="0 0 200 12"
+                fill="none"
+              >
+                <path
+                  d="M2 6 Q 12 1, 22 6 T 42 6 T 62 6 T 82 6 T 102 6 T 122 6 T 142 6 T 162 6 T 182 6 T 198 6"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* =====================================================================
-          CONTACT ("Let's build something great together")
-         ===================================================================== */}
-      <section
-        id="contact"
-        className="py-24 lg:py-32 px-6 lg:px-16 max-w-[1440px] mx-auto border-t border-white/[0.06]"
-      >
-        <div className="max-w-xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2.5 text-xs font-mono-num tracking-widest text-[#14B8A6] mb-4">
-            <span className="w-4 h-[1px] bg-[#14B8A6]" aria-hidden="true" />
-            <span>GET IN TOUCH</span>
-          </div>
+            {/* Four Distinct Colorful Neo-Brutalist Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mt-4 z-10">
+              {/* 1. Email Button (Coral Red) */}
+              <a
+                href="mailto:uxforger@gmail.com"
+                onClick={handleCopyEmail}
+                className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#FF5A43] hover:bg-[#EE4932] text-white font-mono font-bold text-xs sm:text-sm rounded-xl border-[2.5px] border-[#141618] shadow-[3.5px_3.5px_0px_#141618] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#141618] active:translate-x-[3.5px] active:translate-y-[3.5px] active:shadow-none transition-all cursor-pointer"
+              >
+                <Mail className="w-4 h-4 text-white" />
+                <span>Email</span>
+              </a>
 
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.05] tracking-tight mb-4">
-            Let&apos;s build something
-            <span className="block italic font-normal text-[#139E93]">great together</span>
-          </h2>
+              {/* 2. LinkedIn Button (Periwinkle Blue) */}
+              <a
+                href={PERSONAL_INFO.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#6B8AFD] hover:bg-[#5777EC] text-white font-mono font-bold text-xs sm:text-sm rounded-xl border-[2.5px] border-[#141618] shadow-[3.5px_3.5px_0px_#141618] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#141618] active:translate-x-[3.5px] active:translate-y-[3.5px] active:shadow-none transition-all cursor-pointer"
+              >
+                <span className="font-display font-black text-xs leading-none">in</span>
+                <span>LinkedIn</span>
+              </a>
 
-          <p className="text-xs sm:text-sm text-[#8C9694] mb-8">
-            Available for freelance projects, collaborations, and UI/UX tutoring.
-          </p>
-
-          {/* Click-to-copy Email Headline */}
-          <button
-            onClick={handleCopyEmail}
-            title="Click to copy email address"
-            className="group inline-flex items-center gap-2.5 font-display text-xl sm:text-3xl text-white hover:text-[#2DD4BF] border-b border-white/15 hover:border-[#14B8A6] pb-1.5 mb-8 transition-colors cursor-pointer"
-          >
-            <span>owoadeopeyemi11@gmail.com</span>
-            {copiedEmail ? (
-              <Check className="w-4 h-4 text-[#14B8A6]" />
-            ) : (
-              <Copy className="w-4 h-4 text-[#687370] group-hover:text-[#14B8A6] transition-colors" />
-            )}
-          </button>
-
-          {/* Social Links Strip */}
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-mono-num tracking-widest text-[#7A8583] mb-10">
-            <a
-              href="https://www.behance.net"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#14B8A6] transition-colors"
-            >
-              · BEHANCE
-            </a>
-            <a
-              href="https://www.linkedin.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#14B8A6] transition-colors"
-            >
-              · LINKEDIN
-            </a>
-            <a
-              href="https://x.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#14B8A6] transition-colors"
-            >
-              · X
-            </a>
-            <a
-              href="https://www.tiktok.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#14B8A6] transition-colors"
-            >
-              · TIKTOK
-            </a>
-            <a
-              href="https://www.instagram.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#14B8A6] transition-colors"
-            >
-              · INSTAGRAM
-            </a>
-            <a href="tel:+2349157460998" className="hover:text-[#14B8A6] transition-colors">
-              · +234 915 746 0998
-            </a>
-          </div>
-
-          {/* Contact Form */}
-          <form onSubmit={handleContactSubmit} className="space-y-3 text-left">
-            {selectedPackage && (
-              <div className="flex items-center justify-between bg-[#102422] border border-[#14B8A6]/40 px-4 py-2 text-xs font-mono-num text-[#2DD4BF]">
-                <span>INQUIRING ABOUT: {selectedPackage.toUpperCase()}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPackage('')}
-                  className="text-white/70 hover:text-white cursor-pointer"
+              {/* 3. WhatsApp Button */}
+              <a
+                href={PERSONAL_INFO.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#FAF7F2] hover:bg-white text-[#141618] font-mono font-bold text-xs sm:text-sm rounded-xl border-[2.5px] border-[#141618] shadow-[3.5px_3.5px_0px_#141618] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#141618] active:translate-x-[3.5px] active:translate-y-[3.5px] active:shadow-none transition-all cursor-pointer"
+              >
+                <svg
+                  className="w-4 h-4 fill-current text-[#141618]"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.05 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.82 11.82 0 00-3.48-8.413Z" />
+                </svg>
+                <span>WhatsApp</span>
+              </a>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                type="text"
-                required
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                placeholder="Your name"
-                className="w-full bg-[#0E1212] border border-white/[0.08] focus:border-[#14B8A6] px-4 py-3 text-xs sm:text-sm text-white placeholder-[#596361] outline-none transition-colors"
-              />
-              <input
-                type="email"
-                required
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="Your email"
-                className="w-full bg-[#0E1212] border border-white/[0.08] focus:border-[#14B8A6] px-4 py-3 text-xs sm:text-sm text-white placeholder-[#596361] outline-none transition-colors"
-              />
+              {/* 4. X / Twitter Button (Mint Teal) */}
+              <a
+                href={PERSONAL_INFO.twitter}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-[#4FD1A5] hover:bg-[#3DC094] text-[#141618] font-mono font-bold text-xs sm:text-sm rounded-xl border-[2.5px] border-[#141618] shadow-[3.5px_3.5px_0px_#141618] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#141618] active:translate-x-[3.5px] active:translate-y-[3.5px] active:shadow-none transition-all cursor-pointer"
+              >
+                <span className="font-display font-black text-sm leading-none">𝕏</span>
+                <span>X / Twitter</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Clean Minimal Centered Sub-Footer as in reference image */}
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-[#71717A]">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#141618]">The UX Forger</span>
+              <span>·</span>
+              <span>Owowade Opeyemi</span>
             </div>
 
-            <textarea
-              rows={4}
-              required
-              value={contactMessage}
-              onChange={(e) => setContactMessage(e.target.value)}
-              placeholder="Tell me about your project..."
-              className="w-full bg-[#0E1212] border border-white/[0.08] focus:border-[#14B8A6] px-4 py-3 text-xs sm:text-sm text-white placeholder-[#596361] outline-none transition-colors resize-none"
-            />
+            <div className="text-center sm:text-left">
+              Designed &amp; built by The UX Forger · © 2026
+            </div>
 
-            <button
-              type="submit"
-              className="w-full py-3.5 bg-[#0F8A82] hover:bg-[#14A399] text-white text-xs font-mono-num tracking-widest font-medium flex items-center justify-center gap-2 transition-colors duration-150 cursor-pointer"
-            >
-              {messageSent ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>MESSAGE SENT TO OWOADE</span>
-                </>
-              ) : (
-                <>
-                  <span>SEND MESSAGE</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-4">
-            <button
-              onClick={() => setIsResumeModalOpen(true)}
-              className="px-6 py-3 bg-transparent hover:bg-white/[0.04] text-[#8C9694] hover:text-white border border-white/10 text-[11px] font-mono-num tracking-widest inline-flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <span>DOWNLOAD RESUME</span>
-              <ArrowDown className="w-3 h-3" />
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsResumeModalOpen(true)}
+                className="hover:text-[#141618] underline underline-offset-4 cursor-pointer"
+              >
+                Resume PDF
+              </button>
+              <a
+                href={PERSONAL_INFO.cvPdfUrl}
+                download="Owowade_Opeyemi_CV.pdf"
+                className="hover:text-[#141618] underline underline-offset-4"
+              >
+                Download CV
+              </a>
+              <a href="#top" className="hover:text-[#141618] font-bold">
+                Back to Top ↑
+              </a>
+            </div>
           </div>
-        </div>
-      </section>
+        </footer>
 
-      {/* =====================================================================
-          FOOTER
-         ===================================================================== */}
-      <footer className="border-t border-white/[0.06] py-8 px-6 lg:px-16 max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono-num text-[#646E6C]">
-        <div className="font-display text-sm text-[#8C9694]">
-          The <span className="italic text-[#14B8A6]">UX</span> Forger © 2026
-        </div>
-        <div className="tracking-widest">OWOADE OPEYEMI · LAGOS, NIGERIA</div>
-        <div>
-          Designed by <span className="text-[#14B8A6]">TheUXForger</span>
-        </div>
-      </footer>
+        {/* =====================================================================
+            MODALS & COMMAND PALETTE
+           ===================================================================== */}
+        <ForgeConsole
+          isOpen={isConsoleOpen}
+          onClose={() => setIsConsoleOpen(false)}
+          onNavigateSection={scrollToSection}
+          onOpenProjectCaseStudy={(projId) => {
+            const proj = PROJECTS.find((p) => p.id === projId);
+            if (proj) openProject(proj);
+          }}
+          onOpenResumeModal={() => setIsResumeModalOpen(true)}
+        />
 
-      {/* =====================================================================
-          INTERACTIVE MODALS (Case Study Lightbox, Resume Preview, Testimonial)
-         ===================================================================== */}
-      <ProjectCaseStudyModal
-        project={selectedProject}
-        onClose={() => setSelectedProject(null)}
-        onInquireProject={handleInquireProject}
-      />
+        <FullScreenCaseStudy
+          project={selectedProject}
+          onClose={closeProject}
+          onInquireProject={handleInquireProject}
+        />
 
-      <ResumePreviewModal
-        isOpen={isResumeModalOpen}
-        onClose={() => setIsResumeModalOpen(false)}
-      />
-
-      <AddTestimonialModal
-        isOpen={isTestimonialModalOpen}
-        onClose={() => setIsTestimonialModalOpen(false)}
-        onAdd={(newTestimonial) => setTestimonials((prev) => [...prev, newTestimonial])}
-      />
-    </div>
+        <ResumeModal
+          isOpen={isResumeModalOpen}
+          onClose={() => setIsResumeModalOpen(false)}
+        />
+      </div>
+    </MotionConfig>
   );
 }
