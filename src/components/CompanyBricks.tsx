@@ -1,146 +1,147 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ChevronDown, Sparkles } from 'lucide-react';
 import { BRICK_COMPANIES } from '../data/portfolioData';
 import { sounds } from '../utils/audio';
-import { ExternalLink, Sparkles, Trophy } from 'lucide-react';
+import { readableOn } from '../utils/color';
+import { EASE_OUT, SPRING_SOFT } from '../utils/motion';
+
+// Hand-stacked toy-brick offsets (x in px, rotation in deg)
+const OFFSETS = [
+  { x: 0, rot: -0.8 },
+  { x: -6, rot: 1.1 },
+  { x: 5, rot: -1.3 },
+  { x: -4, rot: 0.9 },
+  { x: 6, rot: -1 },
+  { x: -3, rot: 1.3 },
+  { x: 3, rot: -0.7 },
+  { x: 0, rot: 0.5 },
+];
 
 export const CompanyBricks: React.FC = () => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  // Staggered horizontal offsets and subtle rotation for authentic toy brick stack
-  const stackOffsets = [
-    { x: 0, rot: -0.8 },
-    { x: -6, rot: 1.2 },
-    { x: 4, rot: -1.4 },
-    { x: -4, rot: 0.9 },
-    { x: 6, rot: -1.1 },
-    { x: -2, rot: 1.5 },
-    { x: 3, rot: -0.7 },
-    { x: 0, rot: 0.5 },
-  ];
+  const toggle = (i: number) => {
+    sounds.playPop(1 + i * 0.07);
+    setOpenIndex((cur) => (cur === i ? null : i));
+  };
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 flex flex-col items-center select-none">
-      {/* Brick Stack Container */}
-      <div className="w-full relative flex flex-col items-center">
-        {BRICK_COMPANIES.map((brick, idx) => {
-          const offset = stackOffsets[idx % stackOffsets.length];
-          const isHovered = hoveredIndex === idx;
-
+    <div className="mx-auto flex max-w-2xl flex-col items-center px-1 py-6 sm:px-4">
+      <ul className="relative flex w-full flex-col items-center">
+        {BRICK_COMPANIES.map((brick, i) => {
+          const offset = OFFSETS[i % OFFSETS.length];
+          const isOpen = openIndex === i;
+          const text = readableOn(brick.color);
+          const panelId = `brick-panel-${i}`;
           return (
-            <motion.div
+            <motion.li
               key={brick.name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.35, delay: idx * 0.05 }}
-              whileHover={{
-                scale: 1.04,
-                y: -6,
-                zIndex: 30,
-                transition: { duration: 0.2 },
-              }}
-              onMouseEnter={() => {
-                setHoveredIndex(idx);
-                sounds.playPop(1 + idx * 0.08);
-              }}
-              onMouseLeave={() => setHoveredIndex(null)}
-              className="w-full sm:w-[94%] max-w-xl relative cursor-pointer my-1.5 transition-all group"
-              style={{
-                transform: `translateX(${offset.x}px) rotate(${offset.rot}deg)`,
-                zIndex: isHovered ? 40 : BRICK_COMPANIES.length - idx,
-              }}
+              initial={{ opacity: 0, y: -40, x: offset.x, rotate: offset.rot * 3 }}
+              whileInView={{ opacity: 1, y: 0, x: offset.x, rotate: isOpen ? 0 : offset.rot, scale: isOpen ? 1.02 : 1 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ ...SPRING_SOFT, delay: 0.04 * i }}
+              className="relative my-1.5 w-full max-w-xl sm:w-[94%]"
+              style={{ zIndex: isOpen ? 40 : BRICK_COMPANIES.length - i }}
             >
-              {/* LEGO 3D Studs Row along top edge of each brick */}
-              <div className="absolute -top-2 left-6 right-6 flex justify-between px-3 pointer-events-none z-10">
-                {[...Array(6)].map((_, sIdx) => (
-                  <div
-                    key={sIdx}
-                    className="w-5 h-2.5 rounded-full shadow-inner border border-black/20"
+              {/* Studs */}
+              <span aria-hidden="true" className="pointer-events-none absolute -top-2 left-6 right-6 z-10 flex justify-between px-3">
+                {Array.from({ length: 6 }).map((_, s) => (
+                  <span
+                    key={s}
+                    className="h-2.5 w-5 rounded-full border border-black/20"
                     style={{
                       backgroundColor: brick.color,
-                      filter: 'brightness(1.15)',
+                      filter: 'brightness(1.12)',
                       boxShadow: '0 -1px 2px rgba(255,255,255,0.4) inset, 0 1px 1px rgba(0,0,0,0.3)',
                     }}
                   />
                 ))}
-              </div>
+              </span>
 
-              {/* Physical Brick Body with 3D Bevel & Shadow */}
               <div
-                className="w-full px-6 py-4 rounded-2xl border-2 border-black/20 relative overflow-hidden transition-shadow duration-200"
+                className="relative w-full overflow-hidden rounded-2xl border-2 border-black/20 transition-shadow duration-300"
                 style={{
                   backgroundColor: brick.color,
-                  color: brick.textColor,
-                  boxShadow: isHovered
-                    ? '0 16px 30px rgba(0,0,0,0.22), 0 6px 0 rgba(0,0,0,0.35)'
+                  color: text,
+                  boxShadow: isOpen
+                    ? '0 18px 34px rgba(0,0,0,0.22), 0 6px 0 rgba(0,0,0,0.35)'
                     : '0 8px 18px rgba(0,0,0,0.12), 0 5px 0 rgba(0,0,0,0.28)',
                 }}
               >
-                {/* Brick Surface Highlight & Texture */}
-                <div className="absolute inset-x-0 top-0 h-1 bg-white/30 pointer-events-none" />
-
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left: Company & Role */}
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <span className="font-display font-extrabold text-2xl sm:text-3xl tracking-tight leading-none drop-shadow-sm">
+                <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-white/30" />
+                <button
+                  type="button"
+                  onClick={() => toggle(i)}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left focus-visible:outline-offset-[-4px] sm:px-6"
+                >
+                  <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="font-display text-2xl font-extrabold leading-none tracking-tight sm:text-3xl">
                       {brick.name}
                     </span>
-                    <span className="text-xs sm:text-sm font-sans font-semibold opacity-90 tracking-wide">
-                      • {brick.role}
-                    </span>
-                  </div>
-
-                  {/* Right: Year Badge */}
-                  <div className="text-[11px] sm:text-xs font-mono font-bold shrink-0 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full border border-white/20 tracking-wider">
-                    {brick.period}
-                  </div>
-                </div>
-
-                {/* Expanded Details Drawer on Hover / Touch */}
-                <AnimatePresence>
-                  {isHovered && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="mt-3 pt-3 border-t border-black/15 text-xs font-sans space-y-1.5"
+                    <span className="text-xs font-semibold tracking-wide opacity-90 sm:text-sm">{brick.role}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      className="rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider sm:text-[11px]"
+                      style={{
+                        borderColor: text === '#FFFFFF' ? 'rgba(255,255,255,0.25)' : 'rgba(20,22,24,0.2)',
+                        backgroundColor: text === '#FFFFFF' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.3)',
+                      }}
                     >
-                      <div className="font-medium opacity-95 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-80" />
-                        <span>{brick.highlight}</span>
-                      </div>
-                      <div className="text-[11px] font-mono opacity-80">
-                        Stack & Tools: {brick.tools}
+                      {brick.period}
+                    </span>
+                    <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3, ease: EASE_OUT }}>
+                      <ChevronDown className="h-4 w-4 opacity-80" aria-hidden="true" />
+                    </motion.span>
+                  </span>
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      id={panelId}
+                      key="panel"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.32, ease: EASE_OUT }}
+                    >
+                      <div
+                        className="mx-5 mb-4 space-y-1.5 border-t pt-3 text-[13px] sm:mx-6"
+                        style={{ borderColor: text === '#FFFFFF' ? 'rgba(255,255,255,0.22)' : 'rgba(20,22,24,0.15)' }}
+                      >
+                        <p className="flex items-start gap-1.5 font-medium leading-relaxed">
+                          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                          <span>{brick.highlight}</span>
+                        </p>
+                        <p className="font-mono text-[11px] opacity-85">Stack &amp; tools: {brick.tools}</p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-            </motion.div>
+            </motion.li>
           );
         })}
+      </ul>
 
-        {/* LEGO Baseplate Platform Pedestal */}
-        <div className="w-[98%] max-w-2xl h-5 bg-[#C9C2B5] rounded-xl border-2 border-[#9E978B] shadow-md mt-2 relative overflow-hidden flex items-center justify-between px-6">
-          <div className="text-[10px] font-mono font-extrabold text-[#5D574E] tracking-widest uppercase">
-            FOUNDATION BASEPLATE · 2024 — PRESENT
-          </div>
-          <div className="flex gap-2">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="w-2.5 h-1.5 bg-[#B5AE9F] rounded-full shadow-inner" />
-            ))}
-          </div>
-        </div>
-
-        {/* Ambient Ground Shadow */}
-        <div className="w-[85%] max-w-lg h-4 bg-black/10 rounded-full blur-md mt-1" />
+      {/* Baseplate */}
+      <div className="relative mt-3 flex h-5 w-[98%] max-w-2xl items-center justify-between overflow-hidden rounded-xl border-2 border-[#9E978B] bg-[#C9C2B5] px-4 shadow-md sm:px-6">
+        <span className="font-mono text-[9px] font-extrabold uppercase tracking-widest text-[#4A453E] sm:text-[10px]">
+          Foundation · 2024 — present
+        </span>
+        <span aria-hidden="true" className="flex gap-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span key={i} className="h-1.5 w-2.5 rounded-full bg-[#B5AE9F] shadow-inner" />
+          ))}
+        </span>
       </div>
+      <div aria-hidden="true" className="mt-1 h-4 w-[85%] max-w-lg rounded-full bg-black/10 blur-md" />
 
-      <p className="text-xs font-mono text-[#71717A] mt-4 text-center">
-        Hover or tap any brick in the stack to inspect key impact and tech stack.
-      </p>
+      <p className="mt-4 text-center font-mono text-xs text-ink-3">Tap any brick to see the impact and tools.</p>
     </div>
   );
 };

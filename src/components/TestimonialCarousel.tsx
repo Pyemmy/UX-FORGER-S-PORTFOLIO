@@ -1,182 +1,214 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, ChevronRight, Quote, Sparkles } from 'lucide-react';
-import { TESTIMONIALS, TestimonialItem } from '../data/portfolioData';
+import { ChevronLeft, ChevronRight, ExternalLink, Quote } from 'lucide-react';
+import { TESTIMONIALS } from '../data/portfolioData';
 import { sounds } from '../utils/audio';
+import { SectionHeader } from './ui/SectionHeader';
+import { SPRING_SOFT } from '../utils/motion';
 
-// Custom sticky note tint rotation inspired by reference image 5
 const NOTE_STYLES = [
-  {
-    bg: 'bg-[#F9C74F]',
-    text: 'text-[#1C1917]',
-    border: 'border-[#E0A820]',
-    tape: 'bg-[#FDF0D5]/80',
-    rotate: '-rotate-1',
-  },
-  {
-    bg: 'bg-[#FF4D6D]',
-    text: 'text-white',
-    border: 'border-[#D92B4B]',
-    tape: 'bg-[#FFF0F3]/80',
-    rotate: 'rotate-1',
-  },
-  {
-    bg: 'bg-[#181E29]',
-    text: 'text-[#F1F5F9]',
-    border: 'border-[#334155]',
-    tape: 'bg-[#475569]/80',
-    rotate: '-rotate-0.5',
-  },
+  { bg: 'bg-[#F9C74F]', text: 'text-[#1C1917]', border: 'border-[#E0A820]', tape: 'bg-[#FDF0D5]/85', tilt: -1.2, chip: 'bg-black/10' },
+  { bg: 'bg-[#D02E50]', text: 'text-white', border: 'border-[#B02442]', tape: 'bg-[#FFF0F3]/85', tilt: 1, chip: 'bg-white/20' },
+  { bg: 'bg-[#181E29]', text: 'text-[#F1F5F9]', border: 'border-[#334155]', tape: 'bg-[#64748B]/80', tilt: -0.6, chip: 'bg-white/15' },
 ];
 
-export const TestimonialCarousel: React.FC = () => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
+/** "Ada Okafor" → "AO"; "TEAM INNOVATEQAS" → "TI" */
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join('');
 
-  const checkScroll = () => {
-    const el = scrollContainerRef.current;
+export const TestimonialCarousel: React.FC = () => {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(true);
+  const [active, setActive] = useState(0);
+  const raf = useRef(0);
+
+  const measure = useCallback(() => {
+    const el = trackRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollLeft(scrollLeft > 10);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-
-    // Calculate approximate active index
-    const cardWidth = 360;
-    const index = Math.round(scrollLeft / cardWidth);
-    setActiveIndex(Math.min(Math.max(0, index), TESTIMONIALS.length - 1));
-  };
-
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    checkScroll();
-    el.addEventListener('scroll', checkScroll, { passive: true });
-    window.addEventListener('resize', checkScroll);
-    return () => {
-      el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('resize', checkScroll);
-    };
+    setCanLeft(scrollLeft > 8);
+    setCanRight(scrollLeft < scrollWidth - clientWidth - 8);
+    // Pin to the ends; otherwise the card whose centre is closest to the track's centre
+    if (scrollLeft <= 8) return setActive(0);
+    if (scrollLeft >= scrollWidth - clientWidth - 8) return setActive(TESTIMONIALS.length - 1);
+    const centre = scrollLeft + clientWidth / 2;
+    let best = 0;
+    let bestDist = Infinity;
+    Array.from(el.children).forEach((child, i) => {
+      const c = child as HTMLElement;
+      const dist = Math.abs(c.offsetLeft + c.offsetWidth / 2 - centre);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    });
+    setActive(best);
   }, []);
 
-  const scrollBy = (offset: number) => {
-    sounds.playPop();
-    scrollContainerRef.current?.scrollBy({ left: offset, behavior: 'smooth' });
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      cancelAnimationFrame(raf.current);
+      raf.current = requestAnimationFrame(measure);
+    };
+    measure();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(raf.current);
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [measure]);
+
+  const scrollToIndex = (i: number) => {
+    const el = trackRef.current;
+    const card = el?.children[i] as HTMLElement | undefined;
+    if (!el || !card) return;
+    sounds.playClick();
+    el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: 'smooth' });
   };
 
-  const scrollToIndex = (idx: number) => {
-    sounds.playClick();
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const cardWidth = 360;
-    el.scrollTo({ left: idx * cardWidth, behavior: 'smooth' });
-  };
+  const step = (dir: 1 | -1) => scrollToIndex(Math.min(TESTIMONIALS.length - 1, Math.max(0, active + dir)));
+
+  const controls = (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => step(-1)}
+        disabled={!canLeft}
+        aria-label="Previous testimonial"
+        className="lift flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink shadow-xs hover:bg-paper-2 disabled:pointer-events-none disabled:opacity-35"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => step(1)}
+        disabled={!canRight}
+        aria-label="Next testimonial"
+        className="lift flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink shadow-xs hover:bg-paper-2 disabled:pointer-events-none disabled:opacity-35"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   return (
     <div className="relative w-full">
-      {/* Editorial Header Annotation (Inspired by reference image 5) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-[#EE5828] mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Word of Mouth · Verified Collaborators</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-display font-extrabold text-[#141618] tracking-tight">
-            What People Say
-          </h2>
-        </div>
+      <SectionHeader
+        id="testimonials-title"
+        accent="#EE5828"
+        kicker="Word of mouth"
+        title="What people say"
+        subtitle="Collaborators, teammates and students on working with me."
+        align="left"
+        aside={controls}
+      />
 
-        {/* Arrow Controls as in reference image 5 */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => scrollBy(-380)}
-            disabled={!canScrollLeft}
-            aria-label="See more testimonials on the left"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#D5CEBF] bg-white text-xs font-mono font-bold text-[#141618] shadow-xs hover:bg-[#FAF7F2] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer group"
-          >
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span className="hidden sm:inline">See More On The Left</span>
-          </button>
-
-          <button
-            onClick={() => scrollBy(380)}
-            disabled={!canScrollRight}
-            aria-label="See more testimonials on the right"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#D5CEBF] bg-white text-xs font-mono font-bold text-[#141618] shadow-xs hover:bg-[#FAF7F2] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer group"
-          >
-            <span className="hidden sm:inline">See More On The Right</span>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-      </div>
-
-      {/* Snap-Scrolling Card Strip */}
       <div
-        ref={scrollContainerRef}
+        ref={trackRef}
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Testimonials"
         tabIndex={0}
-        aria-label="Testimonial slider, use arrow keys to navigate"
         onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') scrollBy(-380);
-          if (e.key === 'ArrowRight') scrollBy(380);
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            step(-1);
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            step(1);
+          }
         }}
-        className="flex gap-6 overflow-x-auto pb-8 pt-4 px-1 snap-x snap-mandatory scrollbar-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3062F7] rounded-2xl"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-4 pb-10 pt-6 sm:-mx-2 sm:gap-6 sm:px-2"
       >
-        {TESTIMONIALS.map((t, idx) => {
-          const style = NOTE_STYLES[idx % NOTE_STYLES.length];
+        {TESTIMONIALS.map((t, i) => {
+          const style = NOTE_STYLES[i % NOTE_STYLES.length];
           return (
-            <motion.div
+            <motion.figure
               key={t.id}
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${TESTIMONIALS.length}`}
+              initial={{ opacity: 0, y: 30, rotate: style.tilt * 4 }}
+              whileInView={{ opacity: 1, y: 0, rotate: style.tilt }}
               whileHover={{ y: -6, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className={`shrink-0 w-[300px] sm:w-[360px] snap-center rounded-2xl p-6 sm:p-7 shadow-lg border relative flex flex-col justify-between ${style.bg} ${style.text} ${style.border} ${style.rotate}`}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ ...SPRING_SOFT, delay: i * 0.06 }}
+              className={`relative flex w-[82vw] max-w-[360px] shrink-0 snap-center flex-col justify-between rounded-2xl border p-6 shadow-lg sm:w-[360px] sm:p-7 ${style.bg} ${style.text} ${style.border}`}
             >
-              {/* Decorative Sticky Tape on top edge */}
-              <div
-                className={`absolute -top-3 left-1/2 -translate-x-1/2 w-20 h-6 ${style.tape} rounded-xs backdrop-blur-xs shadow-xs border border-black/5 -rotate-1`}
+              <span
+                aria-hidden="true"
+                className={`absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 -rotate-2 rounded-xs border border-black/5 shadow-xs ${style.tape}`}
               />
-
-              {/* Quote mark & content */}
-              <div>
-                <Quote className="w-6 h-6 opacity-40 mb-3" />
-                <p className="text-sm sm:text-base font-sans font-medium leading-relaxed mb-6">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-              </div>
-
-              {/* Author & credential */}
-              <div className="pt-4 border-t border-black/10 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center font-display font-bold text-xs shrink-0">
-                  {t.author.substring(0, 2)}
-                </div>
-                <div>
-                  <h4 className="text-xs font-mono font-bold tracking-tight uppercase">
-                    {t.author}
-                  </h4>
-                  <p className="text-[11px] font-mono opacity-80">
+              <blockquote>
+                <Quote className="mb-3 h-6 w-6 opacity-40" aria-hidden="true" />
+                <p className="mb-6 text-[15px] font-medium leading-relaxed sm:text-base">&ldquo;{t.quote}&rdquo;</p>
+              </blockquote>
+              <figcaption className="flex items-center gap-3 border-t border-black/10 pt-4">
+                {t.photo ? (
+                  <img
+                    src={t.photo}
+                    alt=""
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white/40"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-xs font-bold ${style.chip}`}
+                  >
+                    {initials(t.author)}
+                  </span>
+                )}
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-tight">
+                    {t.link ? (
+                      <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+                        {t.author}
+                        <ExternalLink className="h-3 w-3 opacity-70" aria-hidden="true" />
+                        <span className="sr-only">(opens in a new tab)</span>
+                      </a>
+                    ) : (
+                      t.author
+                    )}
+                  </span>
+                  <span className="block font-mono text-[11px] opacity-85">
                     {t.role} · {t.company}
-                  </p>
-                </div>
-              </div>
-            </motion.div>
+                  </span>
+                </span>
+              </figcaption>
+            </motion.figure>
           );
         })}
       </div>
 
-      {/* Progress Dots Indicator */}
-      <div className="flex items-center justify-center gap-2 pt-2">
-        {TESTIMONIALS.map((_, idx) => (
+      <div className="flex items-center justify-center gap-2" role="group" aria-label="Choose testimonial">
+        {TESTIMONIALS.map((t, i) => (
           <button
-            key={idx}
-            onClick={() => scrollToIndex(idx)}
-            aria-label={`Jump to testimonial ${idx + 1}`}
-            className={`h-2 rounded-full transition-all cursor-pointer ${
-              activeIndex === idx
-                ? 'w-6 bg-[#141618]'
-                : 'w-2 bg-[#D5CEBF] hover:bg-[#8A8275]'
-            }`}
-          />
+            key={t.id}
+            type="button"
+            onClick={() => scrollToIndex(i)}
+            aria-label={`Show testimonial ${i + 1}`}
+            aria-current={active === i ? 'true' : undefined}
+            className="flex h-6 min-w-6 items-center justify-center"
+          >
+            <motion.span
+              className="block h-2 rounded-full"
+              animate={{ width: active === i ? 24 : 8, backgroundColor: active === i ? '#141618' : '#D5CEBF' }}
+              transition={{ duration: 0.3 }}
+            />
+          </button>
         ))}
       </div>
     </div>

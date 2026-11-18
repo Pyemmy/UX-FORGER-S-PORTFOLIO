@@ -36,18 +36,13 @@ export interface ProjectItem {
   tradeoffs?: string[];
   caseStudySections?: CaseStudySection[];
   mockupImage?: string;
+  /** Extra screens shown in the case study gallery. */
+  gallery?: { src: string; alt: string }[];
   numberIndex?: string;
   displayTitle?: string;
   displayCategory?: string;
   editorialSummary?: string;
   myRoleTitle?: string;
-  handwrittenNote?: string;
-  platformBadges?: {
-    type: 'apple' | 'google' | 'web' | 'hash';
-    label: string;
-    sublabel: string;
-    url?: string;
-  }[];
 }
 
 export interface CapabilityItem {
@@ -73,32 +68,41 @@ export interface ExperimentItem {
   whatItIs: string;
   whatItDoes: string;
   whyItExists: string;
+  /** Slug of the matching case study in PROJECTS, if there is one. */
+  projectSlug?: string;
 }
 
 export interface TestimonialItem {
   id: string;
   quote: string;
+  /** The person's real name, e.g. "Ada Okafor". */
   author: string;
   role: string;
   company: string;
+  /** Optional headshot, e.g. /assets/photos/testimonials/ada.webp */
+  photo?: string;
+  /** Optional LinkedIn or website so visitors can verify the quote. */
+  link?: string;
 }
 
 export const PERSONAL_INFO = {
-  name: 'Owowade Opeyemi',
+  name: 'Owoade Opeyemi',
+  fullName: 'Owoade Opeyemi Ismail',
   brandName: 'The UX Forger',
   headline: 'I design products and I ship them.',
   bio: 'Product Designer and Design Engineer. I solve product problems, design how things should work, and get involved in building them too.',
   roleTitle: 'Product Designer & Engineer',
   specialization: 'AI-Assisted Building & Systems Thinking',
   currentFocus: 'Senior Product Designer at EcoVest · Founder of Forge Academy',
-  availability: 'Available for Q4 · Lagos / Remote',
+  availability: 'Booking projects for early 2027',
   email: 'uxforger@gmail.com',
   phone: '+234 810 752 2288',
   phoneDisplay: '+234 810 752 2288',
   website: 'https://uxforger.live',
   websiteDisplay: 'uxforger.live',
   location: 'Lagos, Nigeria (open to remote)',
-  cvPdfUrl: '/Owowade_Opeyemi_CV.pdf',
+  cvPdfUrl: '/Owoade_Opeyemi_CV.pdf',
+  cvFileName: 'Owoade_Opeyemi_CV.pdf',
   github: 'https://github.com/theuxforger',
   linkedin: 'https://linkedin.com/in/owoade-opeyemi',
   twitter: 'https://x.com/theuxforger',
@@ -115,18 +119,18 @@ export const AWARDS_LIST = [
     organization: 'University of Lagos Quality Assurance & SERVICOM Unit',
     date: '2026',
     description:
-      'Product designer and engineer on Team InnovateQAS. Built QualityHub over four months of strategy, research, and functional prototyping. Features are slated for inclusion in UNILAG’s institutional QAS platform.',
+      'Product designer and engineer on Team InnovateQAS. Built QualityHub over four months of strategy, research, and functional prototyping. Features are slated for inclusion in UNILAG’s institutional QAS platform; the team also earned industry placement and was featured on the university website.',
     badgeTag: '1ST RUNNER UP · 14 TEAMS',
   },
   {
     id: 'buildverse-babasika',
     title: 'BuildVerse Hackathon · The John Amhanesi Foundation',
-    place: 'Honourable Mention',
+    place: 'Honourable Mention + ₦100,000',
     organization: 'The John Amhanesi Foundation',
     date: '2026',
     description:
       'Led product, UX and design in a 3-person team over 36 hours. Built BabaSika, a WhatsApp and USSD pension-savings onboarding and contribution experience for Nigeria’s 92M informal workers.',
-    badgeTag: 'HONOURABLE MENTION · BUILDVERSE',
+    badgeTag: 'HONOURABLE MENTION + ₦100K · BUILDVERSE',
   },
   {
     id: 'hackathon-veteran',
@@ -211,6 +215,7 @@ export const EXPERIMENTS: ExperimentItem[] = [
     whatItIs: 'A voice-to-PDF invoice generator built for informal market merchants in West Africa.',
     whatItDoes: 'Transcribes spoken Nigerian Pidgin and plain English into formatted line-item calculations and instant PDF export.',
     whyItExists: 'Solo traders lose significant revenue and time calculating bills manually over chat.',
+    projectSlug: 'quickbill',
   },
   {
     id: 'forge-ai',
@@ -227,6 +232,7 @@ export const EXPERIMENTS: ExperimentItem[] = [
     whatItIs: 'A concept demonstrator exploring real-time UI code synthesis with dynamic state transitions.',
     whatItDoes: 'Simulates the transformation of abstract product briefs into interactive tokens and components at 60 FPS.',
     whyItExists: 'To test how designers and developers can visualize AI code synthesis without black-box confusion.',
+    projectSlug: 'forge-ai',
   },
   {
     id: 'vale',
@@ -243,6 +249,7 @@ export const EXPERIMENTS: ExperimentItem[] = [
     whatItIs: 'An experiential e-commerce concept testing digital warmth and physical metaphor.',
     whatItDoes: 'Maps cursor interaction to wick physics, dims surrounding surfaces, and modulates ambient scent color temperature.',
     whyItExists: 'Luxury artisanal brands need emotional texture online that flat static catalog photos cannot deliver.',
+    projectSlug: 'vale',
   },
   {
     id: 'smartajo',
@@ -254,11 +261,12 @@ export const EXPERIMENTS: ExperimentItem[] = [
       'A digital trust layer for Nigeria’s informal cooperative savings circles, featuring AI default risk scoring and USSD flows.',
     stack: ['Fintech UX', 'USSD Journeys', 'Credit Profiling', 'Multilingual'],
     badge: 'FINTECH CONCEPT',
-    color: '#0E857D',
+    color: '#0C7770',
     status: 'Live Experiment',
     whatItIs: 'A community savings risk-scoring prototype for informal cooperative groups (Ajo/Esusu).',
     whatItDoes: 'Evaluates informal payout reliability to recommend sustainable contribution amounts across 4 Nigerian languages.',
     whyItExists: 'Informal savings organizers take personal financial liability when group members default on their turns.',
+    projectSlug: 'smartajo',
   },
 ];
 
@@ -283,27 +291,16 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Lead Product Designer & Frontend Engineer',
     clientOrOrg: 'University of Lagos QAS Unit',
     technologies: ['Google AI Studio', 'React', 'TypeScript', 'Tailwind CSS', 'Vercel'],
-    mockupImage: '/assets/aistudio/qualityhub_window.png',
+    mockupImage: '/assets/projects/qualityhub.webp',
+    gallery: [
+      { src: '/assets/projects/qualityhub-2.webp', alt: 'QualityHub student dashboard with course reviews and complaint tracking' },
+    ],
     numberIndex: '01',
     displayTitle: 'QualityHub',
     displayCategory: 'Institutional Compliance Platform',
     editorialSummary:
-      'Developed A Transparent Campus Complaint & Resolution Experience That Makes Accountability Verifiable For Every Student.',
+      'A transparent campus complaint and resolution platform that makes accountability verifiable for every student.',
     myRoleTitle: 'Lead Product Designer & Frontend Engineer',
-    handwrittenNote: 'Campus Complaints Resolved 4.2× Faster Yunno ?',
-    platformBadges: [
-      {
-        type: 'web',
-        label: 'Live Production Web',
-        sublabel: 'qas-servicom.vercel.app',
-        url: 'https://qas-servicom-compliance-platform.vercel.app',
-      },
-      {
-        type: 'hash',
-        label: 'Audit Trail Engine',
-        sublabel: 'Verifiable Hash Codes',
-      },
-    ],
     shortDescription:
       'Four months of strategy, design, and development for a university-wide platform that tracks, resolves, and verifies student complaints with full administrative transparency.',
     problem:
@@ -365,7 +362,7 @@ export const PROJECTS: ProjectItem[] = [
         subtitle: 'Shipping to Vercel and pitching to university leadership',
         content: [
           'Using Google AI Studio and React, we iterated from Figma wireframes to a fully interactive, deployed web application on Vercel. We stress-tested the platform with simulated multi-department escalations.',
-          'During the final grand pitch before UNILAG leadership, Team InnovateQAS earned 1st Runner Up out of 14 competing teams. Platform features and UX patterns are currently slated for integration into UNILAG’s official digital services platform.',
+          'During the final grand pitch before UNILAG leadership, Team InnovateQAS earned 1st Runner Up out of 14 competing teams. Platform features and UX patterns are slated for integration into UNILAG’s official QAS platform, and the team earned industry placement, access to the QAS Unit and university tech hub, and a feature on the university website.',
         ],
       },
     ],
@@ -381,41 +378,25 @@ export const PROJECTS: ProjectItem[] = [
     title: 'Micro-pensions for Nigeria’s 92M informal workers',
     subtitle: 'BabaSika: WhatsApp & USSD Informal Pension Engine',
     category: 'Product Case Study',
-    tagline: 'Honourable Mention · BuildVerse Hackathon 2026',
-    awardOrBadge: '🏆 HONOURABLE MENTION',
+    tagline: 'Honourable Mention + ₦100,000 · BuildVerse Hackathon 2026',
+    awardOrBadge: '🏆 HONOURABLE MENTION + ₦100,000',
     featured: true,
     buildDuration: '36-Hour Hackathon Sprint',
     year: '2026',
     role: 'Product Lead & UX Strategist',
     clientOrOrg: 'The John Amhanesi Foundation',
     technologies: ['WhatsApp Business API', 'USSD Flows', 'Figma', 'Fintech UX'],
-    mockupImage: '/assets/aistudio/babasika_window.png',
+    mockupImage: '/assets/projects/babasika.webp',
+    gallery: [
+      { src: '/assets/projects/babasika-2.webp', alt: 'BabaSika landing page: “Small small, your future dey grow.”' },
+    ],
     liveUrl: 'https://baba-sika.vercel.app/',
     numberIndex: '02',
     displayTitle: 'BabaSika',
     displayCategory: 'Conversational Pension Web App & USSD',
     editorialSummary:
-      'Engineered A Conversational Pension Experience Enabling 92 Million Informal Workers To Save For Retirement.',
+      'A conversational pension experience that helps Nigeria’s 92 million informal workers save for retirement, from just ₦200.',
     myRoleTitle: 'Product Lead & UX Strategist',
-    handwrittenNote: 'Retirement Savings From Just ₦200 Yunno ?',
-    platformBadges: [
-      {
-        type: 'web',
-        label: 'Live Web Sandbox',
-        sublabel: 'baba-sika.vercel.app',
-        url: 'https://baba-sika.vercel.app/',
-      },
-      {
-        type: 'hash',
-        label: 'WhatsApp Bot',
-        sublabel: 'Pidgin Voice Flow',
-      },
-      {
-        type: 'hash',
-        label: 'Offline USSD',
-        sublabel: 'Dial *123# Anywhere',
-      },
-    ],
     shortDescription:
       'Designed a frictionless WhatsApp and USSD pension savings experience tailored for market traders, artisans, and transport workers across Nigeria.',
     problem:
@@ -484,26 +465,16 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Senior Product Designer',
     clientOrOrg: 'EcoVest Technology Ltd',
     technologies: ['Mobile UI/UX', 'Figma', 'Design Systems', 'Fintech Architecture'],
-    mockupImage: '/assets/aistudio/714shots_so__1__85609bdb.png',
+    mockupImage: '/assets/projects/pocketa.webp',
+    gallery: [
+      { src: '/assets/projects/pocketa-2.webp', alt: 'Pocketa savings goals and money-left screens' },
+    ],
     numberIndex: '03',
     displayTitle: 'Pocketa',
     displayCategory: 'Mobile Application',
     editorialSummary:
-      'Crafted A Student Money Experience Built Around A Forgiving Safe-To-Spend Daily Pacing Engine.',
+      'A student money app built around a forgiving “Safe-to-Spend” daily pacing engine instead of scary red alerts.',
     myRoleTitle: 'Senior Product Designer',
-    handwrittenNote: 'Student Budgeting Can Actually Feel Forgiving Yunno ?',
-    platformBadges: [
-      {
-        type: 'apple',
-        label: 'Download on the',
-        sublabel: 'App Store',
-      },
-      {
-        type: 'google',
-        label: 'Download on the',
-        sublabel: 'Play Store',
-      },
-    ],
     shortDescription:
       'Leading end-to-end product design for Pocketa, defining core user journeys from allowance budgeting to real-time expense tracking and emergency savings pots.',
     problem:
@@ -574,23 +545,14 @@ export const PROJECTS: ProjectItem[] = [
     numberIndex: '04',
     displayTitle: 'Ventics AI',
     displayCategory: 'Generative AI Web Experience',
-    mockupImage: '/assets/aistudio/ventics_window.png',
-    editorialSummary:
-      'Designed An AI Interior Staging Platform Converting Rough Room Photos Into Photorealistic Decor In Seconds.',
-    myRoleTitle: 'Founding Product Designer',
-    handwrittenNote: 'Interior Styling Without Waiting 3 Days Yunno ?',
-    platformBadges: [
-      {
-        type: 'web',
-        label: 'Interactive Sandbox',
-        sublabel: 'Before / After Slider',
-      },
-      {
-        type: 'hash',
-        label: 'Waitlist Launch',
-        sublabel: '34.2% Conversion',
-      },
+    mockupImage: '/assets/projects/ventics-ai.webp',
+    gallery: [
+      { src: '/assets/projects/ventics-ai-2.webp', alt: 'Ventics AI landing page hero on a desktop browser' },
+      { src: '/assets/projects/ventics-ai-3.webp', alt: 'Ventics AI waitlist page' },
     ],
+    editorialSummary:
+      'An AI interior staging platform that turns rough room photos into photorealistic decor in seconds.',
+    myRoleTitle: 'Founding Product Designer',
     shortDescription:
       'Led end-to-end design of an AI-powered interior design platform from concept to waitlist launch, achieving a 34.2% visitor-to-waitlist conversion rate.',
     problem:
@@ -655,24 +617,13 @@ export const PROJECTS: ProjectItem[] = [
     numberIndex: '05',
     displayTitle: 'QuickBill',
     displayCategory: 'WhatsApp Automation Tool',
-    mockupImage: '/assets/aistudio/quickbill_window.png',
-    editorialSummary:
-      'Built A Voice-Driven WhatsApp Invoicing Engine For Solo African Bakers, Artisans & Vendors.',
-    myRoleTitle: 'Product Designer & AI Engineer',
-    handwrittenNote: 'Voice-To-WhatsApp Invoice In 2 Seconds Yunno ?',
-    platformBadges: [
-      {
-        type: 'web',
-        label: 'Live Render Service',
-        sublabel: 'WhatsApp Webhook API',
-        url: 'https://quickbill-m-cord.onrender.com',
-      },
-      {
-        type: 'hash',
-        label: 'Pidgin Voice Engine',
-        sublabel: 'Local Currency Parser',
-      },
+    mockupImage: '/assets/projects/quickbill.webp',
+    gallery: [
+      { src: '/assets/projects/quickbill-2.webp', alt: 'QuickBill landing page: “Invoice. Verify. Get Paid Faster.”' },
     ],
+    editorialSummary:
+      'A voice-driven WhatsApp invoicing tool for solo bakers, artisans and vendors, built in three hours.',
+    myRoleTitle: 'Product Designer & AI Engineer',
     shortDescription:
       'A working invoicing tool that turns plain-English or Nigerian Pidgin instructions into a WhatsApp-ready PDF invoice. Wrote the product spec and UI reference first.',
     problem:
@@ -714,7 +665,13 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Product Designer & Frontend Engineer',
     clientOrOrg: 'Self-Initiated Build Sprint',
     technologies: ['React', 'Motion', 'Vercel', 'Tailwind CSS'],
-    mockupImage: '/assets/aistudio/forge_window.png',
+    mockupImage: '/assets/projects/forge-ai.webp',
+    numberIndex: '06',
+    displayTitle: 'FORGE',
+    displayCategory: 'AI Product Engineer · Landing Experience',
+    editorialSummary:
+      'A landing experience that shows a raw idea becoming tokens, wireframes and production React code, in motion.',
+    myRoleTitle: 'Product Designer & Frontend Engineer',
     shortDescription:
       'A showcase landing experience for an autonomous product engineer that transforms raw text ideas into structured UI, design systems, and verified code.',
     problem:
@@ -756,6 +713,12 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Product Designer & Creative Technologist',
     clientOrOrg: 'Creative Lab Sprint',
     technologies: ['React', 'CSS Illumination', 'Sound FX', 'Vercel'],
+    numberIndex: '07',
+    displayTitle: 'Vale',
+    displayCategory: 'Experiential Candle Website',
+    editorialSummary:
+      'An ambient candle site where you light the wick yourself and the glow shifts with every scent.',
+    myRoleTitle: 'Product Designer & Creative Technologist',
     shortDescription:
       'An ambient interactive candle flagship where visitors light the candle wick, and page illumination dynamically shifts across scent notes.',
     problem:
@@ -796,6 +759,12 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Lead UX Strategist',
     clientOrOrg: 'Fintech Community Challenge',
     technologies: ['Fintech Architecture', 'Figma', 'USSD Journeys', 'Risk Scoring UX'],
+    numberIndex: '08',
+    displayTitle: 'SmartAjo',
+    displayCategory: 'Fintech Trust Layer · WhatsApp & USSD',
+    editorialSummary:
+      'A digital trust layer for Ajo/Esusu savings circles, with AI default-risk scoring and multilingual USSD flows.',
+    myRoleTitle: 'Lead UX Strategist',
     shortDescription:
       'A digital trust layer for Nigeria’s informal Ajo/Esusu savings circles, combining AI default risk prediction with multilingual WhatsApp/USSD flows.',
     problem:
@@ -835,6 +804,12 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Product Designer & User Researcher',
     clientOrOrg: 'Healthcare Community Initiative',
     technologies: ['Mobile Health UX', 'Figma', 'Accessibility (WCAG AAA)', 'Emergency Triggers'],
+    numberIndex: '09',
+    displayTitle: 'CareCell',
+    displayCategory: 'Healthcare Mobile App',
+    editorialSummary:
+      'A calm, high-contrast companion that helps sickle cell warriors log pain crises and call for help in one tap.',
+    myRoleTitle: 'Product Designer & User Researcher',
     shortDescription:
       'A mobile app designed with high-contrast accessibility standards to help sickle cell patients track pain crises, manage daily hydration, and summon rapid emergency assistance.',
     problem:
@@ -874,6 +849,12 @@ export const PROJECTS: ProjectItem[] = [
     role: 'Product Designer & Systems Architect',
     clientOrOrg: 'Pivot Youth Rehabilitation Initiative',
     technologies: ['Therapeutic UX', 'Game Systems', 'Physical & Digital Tokens', 'Emotional Accessibility'],
+    numberIndex: '10',
+    displayTitle: 'Pivot',
+    displayCategory: 'Therapeutic Board Game',
+    editorialSummary:
+      'A cooperative board game that turns addiction recovery into supportive group play, designed with therapeutic UX.',
+    myRoleTitle: 'Product Designer & Systems Architect',
     shortDescription:
       'Designing a cooperative board game that guides youth drug addiction recovery, applying therapeutic UX principles, emotional accessibility, and supportive game mechanics.',
     problem:
@@ -902,7 +883,7 @@ export const BRICK_COMPANIES = [
   {
     name: 'EcoVest',
     role: 'Senior Product Designer',
-    period: '2026 — Present',
+    period: 'May 2026 — Now',
     color: '#2FA06A',
     textColor: '#FFFFFF',
     highlight: 'Designed Pocketa PFM app, Safe-to-Spend pacing engine & onboarding for 20k+ users.',
@@ -911,7 +892,7 @@ export const BRICK_COMPANIES = [
   {
     name: 'Forge Academy',
     role: 'Founder & Lead Instructor',
-    period: '2026 — Present',
+    period: 'Jun 2026 — Now',
     color: '#EE5828',
     textColor: '#FFFFFF',
     highlight: 'Founded community academy, mentored 10+ students through design systems & AI workflows.',
@@ -920,35 +901,35 @@ export const BRICK_COMPANIES = [
   {
     name: 'Ventics AI',
     role: 'Founding Product Designer',
-    period: '2026',
+    period: 'Jan — Apr 2026',
     color: '#9B8AF5',
     textColor: '#FFFFFF',
     highlight: 'Designed AI room transformer waitlist & editor UI, reaching 34.2% conversion.',
     tools: 'Next.js, Tailwind, Figma, Stable Diffusion Workflows',
   },
   {
-    name: 'Wrix-Way Hub',
+    name: 'Wrix-Way Tech Hub',
     role: 'UI/UX Design Tutor',
-    period: '2026',
+    period: 'Apr — Jun 2026',
     color: '#3062F7',
     textColor: '#FFFFFF',
     highlight: 'Trained students on UI principles, wireframing, and Figma prototyping fundamentals.',
     tools: 'Figma, UX Research, Design Thinking',
   },
   {
-    name: 'Pivot Game',
+    name: 'Pivot',
     role: 'Product Designer',
-    period: '2025 — Present',
+    period: 'Dec 2025 — Now',
     color: '#F4BE24',
     textColor: '#121316',
-    highlight: 'Created gamified mental resilience UI, safe-zone progression boards & coping decks.',
-    tools: 'Mobile UX, Micro-interactions, Motion UI',
+    highlight: 'Designing a cooperative recovery board game: safe-zone progression board and coping-strategy card decks.',
+    tools: 'Therapeutic UX, Game Systems, Card & Board Design',
   },
   {
     name: 'Cowrywise',
     role: 'Campus Ambassador',
-    period: '2025 — Present',
-    color: '#0E857D',
+    period: 'Dec 2025 — Now',
+    color: '#0C7770',
     textColor: '#FFFFFF',
     highlight: 'Championed financial literacy & fintech adoption across UNILAG campus community.',
     tools: 'FinTech Advocacy, Community Leadership',
@@ -956,7 +937,7 @@ export const BRICK_COMPANIES = [
   {
     name: 'PlastiBuild',
     role: 'Product Design Intern',
-    period: '2025',
+    period: 'Oct — Dec 2025',
     color: '#C92A54',
     textColor: '#FFFFFF',
     highlight: 'Designed circular economy waste tracking & eco-rewards redemption experience.',
@@ -965,7 +946,7 @@ export const BRICK_COMPANIES = [
   {
     name: 'NAMSSN UNILAG',
     role: 'Assistant General Secretary',
-    period: '2026 — Present',
+    period: 'Aug 2026 — Now',
     color: '#181B20',
     textColor: '#FFFFFF',
     highlight: 'Organized academic & tech empowerment initiatives for math & science students.',
@@ -1242,7 +1223,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'Design Engineering & Builder',
     year: '2024 — Present',
     location: 'Lagos, Nigeria',
-    image: '/assets/aistudio/IMG_9969_f5884aae.jpeg',
+    image: '/assets/photos/portrait.webp',
     imageCaption: 'Opeyemi — Product Designer & Design Engineer bridging design systems, rapid AI velocity, and production code.',
     tags: ['Design Systems', 'React', 'Rapid MVP', 'Figma Tokens'],
     accentColor: '#3062F7',
@@ -1264,7 +1245,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'TID 5.0 Hackathon Stage',
     year: '2026',
     location: 'UNILAG Main Auditorium · Lagos',
-    image: '/assets/aistudio/IMG_9964__1__1a53f11a.jpeg',
+    image: '/assets/photos/stage-tid.webp',
     imageCaption: 'Pitching on stage at The Industry Discourse (TID 5.0) Hackathon · NEX FRONT, defending product architecture alongside teammates.',
     tags: ['TID 5.0 Hackathon', 'Hackathon Pitching', 'BuildVerse', 'Stage Defense'],
     accentColor: '#EE5828',
@@ -1286,8 +1267,8 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'UX Design Masterclass · AfriAI',
     year: '2025 — 2026',
     location: 'AfriAI · Virtual & Lagos',
-    image: '/assets/aistudio/image_985c6a73.png',
-    imageCaption: 'Invited speaker flyer for the UX Design Masterclass for Beginners · AfriAI: "Meet Our Speakers — Owoade Opeyemi (The UX Forger)".',
+    image: '/assets/photos/speaker-afriai.webp',
+    imageCaption: 'Invited speaker flyer for the UX Design Masterclass for Beginners · AfriAI: “Meet Our Speakers — Owoade Opeyemi (The UX Forger)”.',
     tags: ['Invited Speaker', 'AfriAI', 'Masterclass', 'UX Education'],
     accentColor: '#9B8AF5',
     imagePosition: 'object-[20%_40%]',
@@ -1308,7 +1289,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'Design Systems & Stage Masterclass',
     year: '2026 — Present',
     location: 'Forge Academy · Hybrid',
-    image: '/assets/aistudio/IMG_5956__1__902b4111.jpeg',
+    image: '/assets/photos/teaching.webp',
     imageCaption: 'On stage breaking down mobile UI architectures, health monitoring metrics, and design systems for aspiring creators.',
     tags: ['Mentorship', 'Design Cohorts', 'UI/UX Training', 'Education'],
     accentColor: '#2FA06A',
@@ -1329,7 +1310,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'Forge Academy Founder',
     year: '2026 — Present',
     location: 'Lagos, Nigeria',
-    image: '/assets/aistudio/IMG_2086_3ecf5b10.jpeg',
+    image: '/assets/photos/founder.webp',
     imageCaption: 'Opeyemi — Founder of Forge Academy & The UX Forger, creating career-transforming learning environments for young builders.',
     tags: ['Founder', 'Community', 'Forge Academy', 'Leadership'],
     accentColor: '#F4BE24',
@@ -1351,7 +1332,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'Culinary Craft · Off-Screen Rituals',
     year: 'Ongoing',
     location: 'Lagos, Nigeria',
-    image: '/assets/aistudio/cooking_strip.jpg',
+    image: '/assets/photos/cooking-strip.webp',
     imagePosition: 'object-center',
     imageCaption: 'Iterative seasoning balances off-screen — from fresh chopped prep and slow-simmered sauce to plated spaghetti.',
     tags: ['Culinary Craft', 'Mechanics', 'Philosophy', 'Creative Balance'],
@@ -1373,7 +1354,7 @@ export const BOOK_CHAPTERS: BookChapter[] = [
     eventOrContext: 'UNILAG QAS & SERVICOM 2026 Stage',
     year: '2024 — Future',
     location: 'Global Reach',
-    image: '/assets/aistudio/QAS_603e031b.jpeg',
+    image: '/assets/photos/qas-stage.webp',
     imageCaption: 'On stage with Vice-Chancellor Prof. Folasade Ogunsola at UNILAG Quality Assurance & SERVICOM Unit 2026 International Customer Service Week — 1st Runner Up (14 teams).',
     tags: ['Academic Journey', 'UNILAG', 'Vision', 'Growth'],
     accentColor: '#141618',
@@ -1389,6 +1370,7 @@ export interface BeyondWorkItem {
   color: string;
   bgTint: string;
   borderColor: string;
+  photo?: { src: string; alt: string };
 }
 
 export const BEYOND_WORK_ITEMS: BeyondWorkItem[] = [
@@ -1402,6 +1384,7 @@ export const BEYOND_WORK_ITEMS: BeyondWorkItem[] = [
     color: '#EE5828',
     bgTint: 'rgba(238, 88, 40, 0.06)',
     borderColor: 'rgba(238, 88, 40, 0.25)',
+    photo: { src: '/assets/photos/cooking.webp', alt: 'Chopped onions and carrots, a simmering sauce, and the finished spaghetti' },
   },
   {
     id: 'gaming',
@@ -1413,6 +1396,7 @@ export const BEYOND_WORK_ITEMS: BeyondWorkItem[] = [
     color: '#3062F7',
     bgTint: 'rgba(48, 98, 247, 0.06)',
     borderColor: 'rgba(48, 98, 247, 0.25)',
+    photo: { src: '/assets/photos/gaming.webp', alt: 'Holding a PlayStation controller in front of a racing game on a laptop' },
   },
   {
     id: 'conversations',

@@ -1,267 +1,203 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  X,
-  Download,
-  FileText,
-  Mail,
-  Phone,
-  Award,
-  Clock,
-  GraduationCap,
-  Copy,
-  Check,
-  ExternalLink,
-} from 'lucide-react';
-import {
-  PERSONAL_INFO,
-  EXPERIENCES,
-  EDUCATION_LIST,
-  AWARDS_LIST,
-  SKILL_CATEGORIES,
-} from '../data/portfolioData';
+import React, { useRef } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Award, Clock, Copy, Download, FileText, GraduationCap, Mail, MapPin, Phone, X } from 'lucide-react';
+import { AWARDS_LIST, EDUCATION_LIST, EXPERIENCES, PERSONAL_INFO } from '../data/portfolioData';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useToast } from './ui/Toast';
+import { EASE_OUT } from '../utils/motion';
 
 interface ResumeModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
-  const [copiedEmail, setCopiedEmail] = useState(false);
+const Dialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const { copy } = useToast();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
-  const handleCopyEmail = () => {
-    navigator.clipboard?.writeText(PERSONAL_INFO.email);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
+  useScrollLock(true);
+  useFocusTrap(panelRef, true, { initialFocus: closeRef, onEscape: onClose });
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-3xl bg-[#171A21] border border-white/10 rounded-xl shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col text-[#F5F7FA]"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Curriculum Vitae"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      onClick={onClose}
+    >
+      <motion.div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resume-title"
+        initial={{ opacity: 0, y: 40, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 30, scale: 0.98, transition: { duration: 0.18 } }}
+        transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-night-2 text-night-text shadow-2xl sm:max-h-[90vh] sm:rounded-2xl"
+      >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-night-3 px-5 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <FileText className="h-5 w-5 shrink-0 text-teal" aria-hidden="true" />
+            <div className="min-w-0">
+              <h2 id="resume-title" className="font-display text-base font-bold text-white">
+                Résumé
+              </h2>
+              <p className="truncate font-mono text-xs text-night-muted">{PERSONAL_INFO.fullName} · The UX Forger</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <a
+              href={PERSONAL_INFO.cvPdfUrl}
+              download={PERSONAL_INFO.cvFileName}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-ink px-3 py-1.5 font-mono text-xs font-medium text-white transition-colors hover:bg-[#0F6449]"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>PDF</span>
+            </a>
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Close résumé"
+              className="rounded-lg p-1.5 text-night-muted transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-8 overflow-y-auto overscroll-contain p-5 text-sm sm:p-8">
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: EASE_OUT, delay: 0.08 }}
+            className="space-y-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-5"
           >
-            {/* Header */}
-            <div className="bg-[#12141A] border-b border-white/10 px-6 py-4 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-[#1D9E75]" />
-                <div>
-                  <h3 className="font-display font-bold text-base text-white">
-                    Official Curriculum Vitae
-                  </h3>
-                  <p className="text-xs font-mono text-[#9BA3AF]">
-                    Owowade Opeyemi · The UX Forger
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <a
-                  href={PERSONAL_INFO.cvPdfUrl}
-                  download="Owowade_Opeyemi_CV.pdf"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1D9E75] hover:bg-[#22B586] text-white text-xs font-mono font-medium rounded-lg transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
-                </a>
-                <button
-                  onClick={onClose}
-                  aria-label="Close CV viewer"
-                  className="p-1.5 rounded-lg text-[#9BA3AF] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="p-6 sm:p-8 overflow-y-auto space-y-8 text-sm">
-              {/* Profile Card */}
-              <div className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
-                  <div>
-                    <h2 className="text-2xl font-display font-bold text-white">
-                      {PERSONAL_INFO.name}
-                    </h2>
-                    <p className="text-xs font-mono text-[#1D9E75]">
-                      {PERSONAL_INFO.roleTitle} · {PERSONAL_INFO.specialization}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleCopyEmail}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-[#9BA3AF] hover:text-white bg-white/5 hover:bg-white/10 rounded border border-white/10 transition-colors"
-                  >
-                    {copiedEmail ? (
-                      <>
-                        <Check className="w-3 h-3 text-[#1D9E75]" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Copy Email</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <p className="text-xs text-[#9BA3AF] leading-relaxed">
-                  Product Designer and Engineer with 2+ years of experience designing web and mobile
-                  products and building them with AI-assisted development. 2× hackathon award winner,
-                  Senior Product Designer at EcoVest, and founder of Forge Academy.
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+              <div>
+                <p className="font-display text-2xl font-bold text-white">{PERSONAL_INFO.name}</p>
+                <p className="font-mono text-xs text-teal">
+                  {PERSONAL_INFO.roleTitle} · {PERSONAL_INFO.specialization}
                 </p>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-[#9BA3AF] pt-1">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-[#1D9E75]" />
-                    {PERSONAL_INFO.email}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-[#1D9E75]" />
-                    {PERSONAL_INFO.phoneDisplay}
-                  </span>
-                  <span className="text-[#C7F36B]">{PERSONAL_INFO.location}</span>
-                </div>
               </div>
-
-              {/* Achievements */}
-              <div>
-                <h4 className="text-xs font-mono uppercase tracking-wider text-[#9BA3AF] font-bold mb-3 flex items-center gap-2">
-                  <Award className="w-4 h-4 text-[#F26522]" />
-                  <span>Competition Achievements &amp; Awards</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {AWARDS_LIST.map((award) => (
-                    <div
-                      key={award.id}
-                      className="p-4 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-1.5"
-                    >
-                      <span className="inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[#F26522]/10 text-[#F26522] border border-[#F26522]/20">
-                        {award.badgeTag}
-                      </span>
-                      <h5 className="font-display font-semibold text-sm text-white">
-                        {award.title}
-                      </h5>
-                      <p className="text-xs text-[#9BA3AF] leading-relaxed">
-                        {award.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Experience */}
-              <div>
-                <h4 className="text-xs font-mono uppercase tracking-wider text-[#9BA3AF] font-bold mb-3 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#1D9E75]" />
-                  <span>Professional Experience</span>
-                </h4>
-                <div className="space-y-3">
-                  {EXPERIENCES.map((exp) => (
-                    <div
-                      key={exp.id}
-                      className="p-4 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-1.5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-display font-semibold text-sm text-white">
-                          {exp.role} · <span className="text-[#1D9E75]">{exp.company}</span>
-                        </span>
-                        <span className="text-[11px] font-mono text-[#6B7280]">
-                          {exp.period}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#9BA3AF] leading-relaxed">
-                        {exp.description}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {exp.skills.map((skill) => (
-                          <span
-                            key={skill}
-                            className="px-2 py-0.5 rounded bg-white/5 text-[10px] font-mono text-[#9BA3AF]"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Education */}
-              <div>
-                <h4 className="text-xs font-mono uppercase tracking-wider text-[#9BA3AF] font-bold mb-3 flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-[#C7F36B]" />
-                  <span>Education &amp; Credentials</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {EDUCATION_LIST.map((edu, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-1"
-                    >
-                      <div className="font-display font-semibold text-xs text-white">
-                        {edu.degree}
-                      </div>
-                      <div className="text-xs font-mono text-[#1D9E75]">
-                        {edu.institution}
-                      </div>
-                      <div className="text-[11px] text-[#6B7280]">{edu.period}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-[#12141A] border-t border-white/10 px-6 py-3.5 flex items-center justify-between shrink-0 text-xs font-mono text-[#9BA3AF]">
-              <span>Official CV stored at public asset path</span>
-              <a
-                href={PERSONAL_INFO.cvPdfUrl}
-                download="Owowade_Opeyemi_CV.pdf"
-                className="inline-flex items-center gap-1.5 text-[#1D9E75] hover:text-[#22B586] font-semibold"
+              <button
+                type="button"
+                onClick={() => copy(PERSONAL_INFO.email, 'Email copied')}
+                className="inline-flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-xs text-night-muted transition-colors hover:bg-white/10 hover:text-white"
               >
-                <span>Download PDF Document</span>
-                <Download className="w-3.5 h-3.5" />
-              </a>
+                <Copy className="h-3 w-3" aria-hidden="true" />
+                Copy email
+              </button>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <p className="text-[13px] leading-relaxed text-night-muted">
+              Product Designer and Engineer with 2+ years of experience designing web and mobile products and building
+              them with AI-assisted development. 2× hackathon award winner, Senior Product Designer at EcoVest, and
+              founder of Forge Academy.
+            </p>
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 font-mono text-xs text-night-muted">
+              <li className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-teal" aria-hidden="true" />
+                <a href={`mailto:${PERSONAL_INFO.email}`} className="hover:text-white">
+                  {PERSONAL_INFO.email}
+                </a>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-teal" aria-hidden="true" />
+                <a href={`tel:${PERSONAL_INFO.phone.replace(/\s/g, '')}`} className="hover:text-white">
+                  {PERSONAL_INFO.phoneDisplay}
+                </a>
+              </li>
+              <li className="flex items-center gap-1.5 text-lime">
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                {PERSONAL_INFO.location}
+              </li>
+            </ul>
+          </motion.section>
+
+          <section>
+            <h3 className="mb-3 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-night-muted">
+              <Award className="h-4 w-4 text-[#FF8A4C]" aria-hidden="true" />
+              Awards &amp; achievements
+            </h3>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {AWARDS_LIST.map((award) => (
+                <li key={award.id} className="space-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                  <span className="inline-block rounded border border-[#F26522]/25 bg-[#F26522]/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#FF8A4C]">
+                    {award.badgeTag}
+                  </span>
+                  <h4 className="font-display text-sm font-semibold text-white">{award.title}</h4>
+                  <p className="text-xs leading-relaxed text-night-muted">{award.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="mb-3 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-night-muted">
+              <Clock className="h-4 w-4 text-teal" aria-hidden="true" />
+              Experience
+            </h3>
+            <ul className="space-y-3">
+              {EXPERIENCES.map((exp) => (
+                <li key={exp.id} className="space-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h4 className="font-display text-sm font-semibold text-white">
+                      {exp.role} · <span className="text-teal">{exp.company}</span>
+                    </h4>
+                    <span className="font-mono text-[11px] text-night-faint">{exp.period}</span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-night-muted">{exp.description}</p>
+                  <ul className="flex flex-wrap gap-1.5 pt-1">
+                    {exp.skills.map((skill) => (
+                      <li key={skill} className="rounded bg-white/5 px-2 py-0.5 font-mono text-[10px] text-night-muted">
+                        {skill}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="mb-3 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-night-muted">
+              <GraduationCap className="h-4 w-4 text-lime" aria-hidden="true" />
+              Education &amp; credentials
+            </h3>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {EDUCATION_LIST.map((edu) => (
+                <li key={`${edu.institution}-${edu.degree}`} className="space-y-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3.5">
+                  <h4 className="font-display text-xs font-semibold text-white">{edu.degree}</h4>
+                  <p className="font-mono text-xs text-teal">{edu.institution}</p>
+                  <p className="text-[11px] text-night-faint">{edu.period}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-night-3 px-5 py-3.5 font-mono text-xs text-night-muted sm:px-6">
+          <span>Updated Nov 2026</span>
+          <a
+            href={PERSONAL_INFO.cvPdfUrl}
+            download={PERSONAL_INFO.cvFileName}
+            className="inline-flex items-center gap-1.5 font-semibold text-teal transition-colors hover:text-[#22B586]"
+          >
+            Download PDF
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
+
+export const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => (
+  <AnimatePresence>{isOpen && <Dialog key="resume" onClose={onClose} />}</AnimatePresence>
+);
