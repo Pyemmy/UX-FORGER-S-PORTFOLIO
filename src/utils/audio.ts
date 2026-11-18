@@ -1,185 +1,117 @@
-// Lightweight Web Audio API Synthesizer for tactile toybox UI feedback
-// Zero external assets, 100% synthesized in real time, safe for all browsers.
+// Lightweight Web Audio synthesizer for tactile UI feedback.
+// No audio files: every sound is generated in real time.
+// Sounds only ever play in response to a click/tap/keypress (a user gesture),
+// so browsers never block or warn about the AudioContext.
+
+type Listener = (muted: boolean) => void;
+
+const STORAGE_KEY = 'uxforger_sound_muted';
 
 class SoundManager {
   private ctx: AudioContext | null = null;
-  public isMuted: boolean = false;
+  private listeners = new Set<Listener>();
+  public isMuted = false;
 
   constructor() {
-    // Check localStorage if available
     try {
-      const saved = localStorage.getItem('uxforger_sound_muted');
-      if (saved !== null) {
-        this.isMuted = saved === 'true';
-      }
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved !== null) this.isMuted = saved === 'true';
     } catch {
-      // Ignore storage access errors
+      // storage unavailable (private mode etc.)
     }
   }
 
-  private initCtx() {
-    if (!this.ctx && typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
+  subscribe(listener: Listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
-  public toggleMute(): boolean {
-    this.isMuted = !this.isMuted;
+  private getCtx(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    if (!this.ctx) {
+      const Ctor =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return null;
+      this.ctx = new Ctor();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    return this.ctx;
+  }
+
+  setMuted(muted: boolean) {
+    this.isMuted = muted;
     try {
-      localStorage.setItem('uxforger_sound_muted', String(this.isMuted));
+      localStorage.setItem(STORAGE_KEY, String(muted));
     } catch {
-      // Ignore
+      // ignore
     }
-    if (!this.isMuted) {
-      this.playPop();
-    }
+    this.listeners.forEach((l) => l(muted));
+    if (!muted) this.playPop();
+  }
+
+  toggleMute(): boolean {
+    this.setMuted(!this.isMuted);
     return this.isMuted;
   }
 
-  // Playful pop sound (like popping bubble wrap)
-  public playPop(pitchMultiplier = 1) {
+  private tone(
+    type: OscillatorType,
+    from: number,
+    to: number,
+    duration: number,
+    gainStart: number,
+    startOffset = 0,
+    mid?: { freq: number; at: number },
+  ) {
     if (this.isMuted) return;
     try {
-      this.initCtx();
-      if (!this.ctx) return;
-
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      const baseFreq = 480 * pitchMultiplier;
-      osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.2, this.ctx.currentTime + 0.08);
-
-      gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
-
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const t0 = ctx.currentTime + startOffset;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(from, t0);
+      if (mid) osc.frequency.exponentialRampToValueAtTime(mid.freq, t0 + mid.at);
+      osc.frequency.exponentialRampToValueAtTime(to, t0 + duration * 0.85);
+      gain.gain.setValueAtTime(gainStart, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.11);
+      gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.01);
     } catch {
-      // Ignore audio errors
+      // ignore audio errors
     }
   }
 
-  // Soft tactile mechanical click
-  public playClick() {
-    if (this.isMuted) return;
-    try {
-      this.initCtx();
-      if (!this.ctx) return;
-
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(140, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.04);
-
-      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.045);
-    } catch {
-      // Ignore
-    }
+  /** Bubble-wrap pop */
+  playPop(pitch = 1) {
+    const base = 480 * pitch;
+    this.tone('sine', base, base * 2.2, 0.1, 0.16);
   }
 
-  // Cute squish / boing sound for mascot buddies
-  public playBoing() {
-    if (this.isMuted) return;
-    try {
-      this.initCtx();
-      if (!this.ctx) return;
-
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(260, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(620, this.ctx.currentTime + 0.12);
-      osc.frequency.exponentialRampToValueAtTime(380, this.ctx.currentTime + 0.22);
-
-      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.26);
-    } catch {
-      // Ignore
-    }
+  /** Soft mechanical click */
+  playClick() {
+    this.tone('triangle', 140, 40, 0.045, 0.14);
   }
 
-  // Rewarding harmonic chime (success, copy, award)
-  public playChime() {
-    if (this.isMuted) return;
-    try {
-      this.initCtx();
-      if (!this.ctx) return;
-
-      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-      notes.forEach((freq, idx) => {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.07);
-
-        gain.gain.setValueAtTime(0.12, this.ctx.currentTime + idx * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.07 + 0.35);
-
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-
-        osc.start(this.ctx.currentTime + idx * 0.07);
-        osc.stop(this.ctx.currentTime + idx * 0.07 + 0.36);
-      });
-    } catch {
-      // Ignore
-    }
+  /** Mascot squish */
+  playBoing() {
+    this.tone('sine', 260, 380, 0.25, 0.18, 0, { freq: 620, at: 0.12 });
   }
 
-  // Soft whoosh transition
-  public playWhoosh() {
-    if (this.isMuted) return;
-    try {
-      this.initCtx();
-      if (!this.ctx) return;
+  /** Success chime (C major arpeggio) */
+  playChime() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone('sine', f, f, 0.35, 0.1, i * 0.07));
+  }
 
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(420, this.ctx.currentTime + 0.15);
-
-      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.19);
-    } catch {
-      // Ignore
-    }
+  /** Page-turn whoosh */
+  playWhoosh() {
+    this.tone('sine', 180, 420, 0.18, 0.08);
   }
 }
 

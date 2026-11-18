@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Play, RefreshCw, Volume2, Copy, Check, Code, ChevronRight } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Volume2, VolumeX, Copy, Check, Code, ChevronRight } from 'lucide-react';
 import { sounds } from '../utils/audio';
+import { readableOn } from '../utils/color';
+import { useToast } from './ui/Toast';
+import { useSoundMuted } from '../hooks/useSoundMuted';
+import { Reveal, RevealItem } from './ui/Reveal';
 
 // Curated Palettes for Forge Generator
 const PALETTES = [
@@ -79,6 +83,10 @@ export const PlaygroundInteractiveToys: React.FC = () => {
 
   // Toy 3: Pidgin Glossary
   const [pidginIndex, setPidginIndex] = useState(0);
+  const [pidginDir, setPidginDir] = useState(1);
+
+  const { copy } = useToast();
+  const muted = useSoundMuted();
 
   const triggerBounce = () => {
     sounds.playBoing();
@@ -90,46 +98,48 @@ export const PlaygroundInteractiveToys: React.FC = () => {
     setPaletteIndex((prev) => (prev + 1) % PALETTES.length);
   };
 
-  const handleCopyColor = (hex: string) => {
-    sounds.playChime();
-    navigator.clipboard?.writeText(hex);
-    setCopiedColor(hex);
-    setTimeout(() => setCopiedColor(null), 1800);
+  const handleCopyColor = async (hex: string) => {
+    if (await copy(hex, `Copied ${hex}`)) {
+      setCopiedColor(hex);
+      setTimeout(() => setCopiedColor(null), 1800);
+    }
   };
 
-  const handleCopySpringCode = () => {
-    sounds.playChime();
-    navigator.clipboard?.writeText(
-      `transition={{ type: "spring", stiffness: ${stiffness}, damping: ${damping} }}`
+  const handleCopySpringCode = async () => {
+    const ok = await copy(
+      `transition={{ type: "spring", stiffness: ${stiffness}, damping: ${damping} }}`,
+      'Spring config copied',
     );
-    setCopiedSpringCode(true);
-    setTimeout(() => setCopiedSpringCode(false), 2000);
+    if (ok) {
+      setCopiedSpringCode(true);
+      setTimeout(() => setCopiedSpringCode(false), 2000);
+    }
   };
 
   const currentPalette = PALETTES[paletteIndex];
   const currentPidgin = PIDGIN_SLANGS[pidginIndex];
 
   return (
-    <div className="space-y-8 my-10 select-none">
+    <div className="space-y-8">
       <div className="text-center">
-        <span className="text-[11px] font-mono font-bold tracking-wider uppercase px-3 py-1 rounded-full bg-[#FAF7F2] border border-[#D5CEBF] text-[#52525B]">
-          INTERACTIVE DESIGN &amp; CODE TOYS
-        </span>
+        <h3 className="font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Interactive toys</h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-ink-3">Small, playable pieces of the craft. Go on, poke them.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Reveal className="grid grid-cols-1 gap-6 md:grid-cols-2" stagger={0.08}>
         {/* =================================================================
             TOY 1: FRAMER MOTION SPRING SANDBOX
            ================================================================= */}
-        <div className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
+        <RevealItem className="h-full">
+        <div className="flex h-full flex-col justify-between space-y-4 rounded-2xl border border-line-soft bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#3062F7] text-white">
                 PHYSICS SANDBOX
               </span>
-              <span className="text-xs font-mono text-[#71717A]">Framer Motion</span>
+              <span className="text-xs font-mono text-ink-3">Framer Motion</span>
             </div>
-            <h4 className="font-display font-bold text-xl text-[#141618]">
+            <h4 className="font-display font-bold text-xl text-ink">
               Spring Physics &amp; Easing Tuner
             </h4>
             <p className="text-xs text-[#52525B] mt-1">
@@ -150,6 +160,15 @@ export const PlaygroundInteractiveToys: React.FC = () => {
               }}
               className="w-16 h-16 bg-[#EE5828] rounded-2xl shadow-lg border-2 border-black/15 flex flex-col items-center justify-center text-white cursor-pointer"
               onClick={triggerBounce}
+              role="button"
+              tabIndex={0}
+              aria-label="Launch the spring"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  triggerBounce();
+                }
+              }}
             >
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-white rounded-full" />
@@ -163,10 +182,11 @@ export const PlaygroundInteractiveToys: React.FC = () => {
           <div className="space-y-3 pt-2 text-xs font-mono">
             <div>
               <div className="flex justify-between text-[#52525B] mb-1">
-                <span>STIFFNESS ({stiffness})</span>
-                <span className="text-zinc-400">High = Snappy</span>
+                <label htmlFor="spring-stiffness">STIFFNESS ({stiffness})</label>
+                <span className="text-ink-3">High = snappy</span>
               </div>
               <input
+                id="spring-stiffness"
                 type="range"
                 min="80"
                 max="500"
@@ -178,10 +198,11 @@ export const PlaygroundInteractiveToys: React.FC = () => {
 
             <div>
               <div className="flex justify-between text-[#52525B] mb-1">
-                <span>DAMPING ({damping})</span>
-                <span className="text-zinc-400">Low = Bouncy</span>
+                <label htmlFor="spring-damping">DAMPING ({damping})</label>
+                <span className="text-ink-3">Low = bouncy</span>
               </div>
               <input
+                id="spring-damping"
                 type="range"
                 min="5"
                 max="40"
@@ -211,19 +232,21 @@ export const PlaygroundInteractiveToys: React.FC = () => {
             </button>
           </div>
         </div>
+        </RevealItem>
 
         {/* =================================================================
             TOY 2: FORGE AI PALETTE GENERATOR
            ================================================================= */}
-        <div className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
+        <RevealItem className="h-full">
+        <div className="flex h-full flex-col justify-between space-y-4 rounded-2xl border border-line-soft bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#F4BE24] text-[#121316]">
                 COLOR LAB
               </span>
-              <span className="text-xs font-mono text-[#71717A]">Contrast Validated</span>
+              <span className="text-xs font-mono text-ink-3">Contrast Validated</span>
             </div>
-            <h4 className="font-display font-bold text-xl text-[#141618]">
+            <h4 className="font-display font-bold text-xl text-ink">
               Forge Harmonic Palettes
             </h4>
             <p className="text-xs text-[#52525B] mt-1">
@@ -235,34 +258,36 @@ export const PlaygroundInteractiveToys: React.FC = () => {
           <div className="space-y-2">
             <div className="text-xs font-mono font-bold text-[#141618] flex items-center justify-between">
               <span>{currentPalette.name}</span>
-              <span className="text-[10px] text-[#71717A]">{paletteIndex + 1} of {PALETTES.length}</span>
+              <span className="text-[10px] text-ink-3">{paletteIndex + 1} of {PALETTES.length}</span>
             </div>
 
             <div className="grid grid-cols-5 gap-2 h-24">
               {currentPalette.colors.map((c, i) => (
-                <motion.div
-                  key={c}
+                <motion.button
+                  type="button"
+                  key={`${paletteIndex}-${c}`}
+                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 24 }}
                   whileHover={{ scale: 1.06, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleCopyColor(c)}
-                  className="rounded-xl shadow-sm border border-black/10 flex flex-col items-center justify-between p-2 cursor-pointer transition-transform group"
-                  style={{ backgroundColor: c }}
-                  title={`Click to copy ${c}`}
+                  aria-label={`Copy ${currentPalette.labels[i]} ${c}`}
+                  className="group flex flex-col items-center justify-between rounded-xl border border-black/10 p-1.5 shadow-sm"
+                  style={{ backgroundColor: c, color: readableOn(c) }}
                 >
-                  <span className="text-[9px] font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">
+                  <span className="font-mono text-[9px] font-bold opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     {copiedColor === c ? '✓' : 'Copy'}
                   </span>
-                  <span className="text-[10px] font-mono font-bold drop-shadow mix-blend-difference text-white">
-                    {c}
-                  </span>
-                </motion.div>
+                  <span className="font-mono text-[9px] font-bold sm:text-[10px]">{c}</span>
+                </motion.button>
               ))}
             </div>
           </div>
 
           {/* Action Row */}
           <div className="pt-2 border-t border-[#F0EBE1] flex items-center justify-between">
-            <span className="text-xs font-mono text-[#71717A]">
+            <span className="text-xs font-mono text-ink-3">
               {copiedColor ? `Copied ${copiedColor}!` : 'Click any color swatch to copy'}
             </span>
             <button
@@ -274,19 +299,21 @@ export const PlaygroundInteractiveToys: React.FC = () => {
             </button>
           </div>
         </div>
+        </RevealItem>
 
         {/* =================================================================
             TOY 3: LAGOS TECH PIDGIN GLOSSARY FLASHCARDS
            ================================================================= */}
-        <div className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
+        <RevealItem className="h-full">
+        <div className="flex h-full flex-col justify-between space-y-4 rounded-2xl border border-line-soft bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#2FA06A] text-white">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#2FA06A] text-ink">
                 CULTURE &amp; COLLABORATION
               </span>
-              <span className="text-xs font-mono text-[#71717A]">Lagos Tech Dictionary</span>
+              <span className="text-xs font-mono text-ink-3">Lagos Tech Dictionary</span>
             </div>
-            <h4 className="font-display font-bold text-xl text-[#141618]">
+            <h4 className="font-display font-bold text-xl text-ink">
               Lagos Tech &amp; Design Dialect
             </h4>
             <p className="text-xs text-[#52525B] mt-1">
@@ -295,20 +322,26 @@ export const PlaygroundInteractiveToys: React.FC = () => {
           </div>
 
           {/* Interactive Card Stage */}
+          <div className="relative overflow-hidden">
+          <AnimatePresence mode="wait" initial={false} custom={pidginDir}>
           <motion.div
             key={pidginIndex}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
+            custom={pidginDir}
+            initial={{ opacity: 0, x: pidginDir * 24, rotate: pidginDir * 1.5 }}
+            animate={{ opacity: 1, x: 0, rotate: 0 }}
+            exit={{ opacity: 0, x: pidginDir * -24, rotate: pidginDir * -1.5 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            aria-live="polite"
             className="p-5 rounded-xl bg-[#FAF7F2] border border-[#E0D9CC] space-y-2 relative"
           >
             <div className="flex items-center justify-between">
               <span
-                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded text-white"
-                style={{ backgroundColor: currentPidgin.badgeColor }}
+                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded"
+                style={{ backgroundColor: currentPidgin.badgeColor, color: readableOn(currentPidgin.badgeColor) }}
               >
                 {currentPidgin.category}
               </span>
-              <span className="text-[10px] font-mono text-[#71717A]">
+              <span className="text-[10px] font-mono text-ink-3">
                 {pidginIndex + 1} of {PIDGIN_SLANGS.length}
               </span>
             </div>
@@ -317,23 +350,26 @@ export const PlaygroundInteractiveToys: React.FC = () => {
               &ldquo;{currentPidgin.phrase}&rdquo;
             </div>
 
-            <div className="text-xs font-mono text-[#71717A]">
+            <div className="text-xs font-mono text-ink-3">
               Literal: {currentPidgin.literal}
             </div>
 
             <div className="text-xs font-sans font-medium text-[#141618] pt-1 border-t border-[#EAE4D7] leading-relaxed">
-              <strong className="text-[#3062F7]">UX Translation:</strong> {currentPidgin.uxMeaning}
+              <strong className="text-cobalt-ink">UX translation:</strong> {currentPidgin.uxMeaning}
             </div>
           </motion.div>
+          </AnimatePresence>
+          </div>
 
           {/* Action Row */}
           <div className="pt-2 border-t border-[#F0EBE1] flex items-center justify-between">
-            <span className="text-xs font-mono text-[#71717A]">
+            <span className="text-xs font-mono text-ink-3">
               Tap Next for more dialect phrases
             </span>
             <button
               onClick={() => {
                 sounds.playPop();
+                setPidginDir(1);
                 setPidginIndex((prev) => (prev + 1) % PIDGIN_SLANGS.length);
               }}
               className="px-4 py-2 bg-[#141618] hover:bg-[#2FA06A] text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -343,19 +379,21 @@ export const PlaygroundInteractiveToys: React.FC = () => {
             </button>
           </div>
         </div>
+        </RevealItem>
 
         {/* =================================================================
             TOY 4: TACTILE SOUND SYNTHESIZER PADS
            ================================================================= */}
-        <div className="bg-white rounded-2xl p-6 border border-[#E0D9CC] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
+        <RevealItem className="h-full">
+        <div className="flex h-full flex-col justify-between space-y-4 rounded-2xl border border-line-soft bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#9B8AF5] text-white">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#9B8AF5] text-ink">
                 SYNTHESIZER
               </span>
-              <span className="text-xs font-mono text-[#71717A]">Web Audio API</span>
+              <span className="text-xs font-mono text-ink-3">Web Audio API</span>
             </div>
-            <h4 className="font-display font-bold text-xl text-[#141618]">
+            <h4 className="font-display font-bold text-xl text-ink">
               Tactile Toybox Audio Pads
             </h4>
             <p className="text-xs text-[#52525B] mt-1">
@@ -369,7 +407,7 @@ export const PlaygroundInteractiveToys: React.FC = () => {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.92 }}
               onClick={() => sounds.playBoing()}
-              className="p-4 rounded-xl bg-[#EE5828] text-white font-mono font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-md hover:brightness-110 cursor-pointer"
+              className="p-4 rounded-xl bg-[#EE5828] text-ink font-mono font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-md hover:brightness-110 cursor-pointer"
             >
               <Volume2 className="w-4 h-4" />
               <span>BOING SQUISH</span>
@@ -379,7 +417,7 @@ export const PlaygroundInteractiveToys: React.FC = () => {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.92 }}
               onClick={() => sounds.playChime()}
-              className="p-4 rounded-xl bg-[#2FA06A] text-white font-mono font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-md hover:brightness-110 cursor-pointer"
+              className="p-4 rounded-xl bg-[#2FA06A] text-ink font-mono font-bold text-xs flex flex-col items-center justify-center gap-1 shadow-md hover:brightness-110 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               <span>CHIME SUCCESS</span>
@@ -408,20 +446,22 @@ export const PlaygroundInteractiveToys: React.FC = () => {
 
           {/* Action Row */}
           <div className="pt-2 border-t border-[#F0EBE1] flex items-center justify-between">
-            <span className="text-xs font-mono text-[#71717A]">
-              Interactive Haptics &amp; Tone Generator
+            <span className="text-xs font-mono text-ink-3">
+              {muted ? 'Turn sound on to hear the pads' : 'Synthesised live, no audio files'}
             </span>
             <button
-              onClick={() => {
-                sounds.toggleMute();
-              }}
-              className="text-xs font-mono text-[#3062F7] hover:underline cursor-pointer"
+              type="button"
+              onClick={() => sounds.toggleMute()}
+              aria-pressed={!muted}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 font-mono text-xs font-bold text-ink transition-colors hover:bg-paper-2"
             >
-              Toggle Global Audio
+              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5 text-mint-ink" />}
+              {muted ? 'Sound off' : 'Sound on'}
             </button>
           </div>
         </div>
-      </div>
+        </RevealItem>
+      </Reveal>
     </div>
   );
 };

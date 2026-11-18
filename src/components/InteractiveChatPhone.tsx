@@ -1,23 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  Send,
-  Download,
-  ExternalLink,
-  Wifi,
-  Battery,
-  Award,
-  Trophy,
-  Calendar,
-  Sparkles,
-  ArrowRight,
-  Check,
-  FileText,
-  Mail,
-  Compass,
-} from 'lucide-react';
+import { Wifi, Battery, ArrowRight } from 'lucide-react';
 import { PERSONAL_INFO } from '../data/portfolioData';
 import { sounds } from '../utils/audio';
+import { useToast } from './ui/Toast';
 
 interface ActionPayload {
   type: 'book_call' | 'view_cv' | 'view_project' | 'copy_email' | 'awards';
@@ -49,7 +35,7 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: 'm-init-2',
     sender: 'forger',
-    text: 'Your project could be next. I’m currently taking on product design leadership and design engineering sprints for Q4.',
+    text: 'Your project could be next. I’m booking product design and design engineering sprints for early 2027.',
     timestamp: 'Just now',
   },
   {
@@ -78,14 +64,13 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const { copy } = useToast();
 
-  // Auto scroll to bottom of chat
+  // Keep the newest message in view (scrolls the chat only, never the page)
   useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
+    const el = chatScrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages, isTyping]);
 
   const addDialogue = (userPrompt: string, responseText: string, actions?: ActionPayload[]) => {
@@ -132,10 +117,9 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
     } else if (action.type === 'view_cv') {
       onOpenResumeModal();
     } else if (action.type === 'copy_email') {
-      sounds.playChime();
-      navigator.clipboard?.writeText(PERSONAL_INFO.email);
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 2000);
+      copy(PERSONAL_INFO.email, 'Email copied');
+    } else if (action.type === 'awards' || action.type === 'view_project') {
+      onSelectProject?.(action.target ?? 'qualityhub');
     }
   };
 
@@ -146,40 +130,49 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
     if (q.includes('call') || q.includes('talk') || q.includes('meet') || q.includes('hire') || q.includes('contact')) {
       addDialogue(
         raw,
-        'Let’s do it! You can reach out directly via my dispatch form below, WhatsApp, or email.',
-        [{ type: 'book_call', label: 'Schedule a Conversation' }]
+        'Let’s do it! Reach me directly by email, WhatsApp or LinkedIn. Everything is just below.',
+        [
+          { type: 'book_call', label: 'Show contact options' },
+          { type: 'copy_email', label: 'Copy my email' },
+        ]
       );
     } else if (q.includes('cv') || q.includes('resume') || q.includes('experience') || q.includes('background')) {
       addDialogue(
         raw,
         'Here is my verified background: Senior Product Designer at EcoVest, Founder of Forge Academy, and studying B.Sc. Industrial Mathematics at UNILAG.',
-        [{ type: 'view_cv', label: 'Open Official CV' }]
+        [{ type: 'view_cv', label: 'Open my CV' }]
       );
     } else if (q.includes('ecovest') || q.includes('pocketa')) {
       addDialogue(
         raw,
         'At EcoVest, I led product design for Pocketa, architecting budget creation, expense tracking, and the Safe-to-Spend pacing engine for young adults.',
-        [{ type: 'book_call', label: 'Discuss Fintech Work' }]
+        [
+          { type: 'view_project', label: 'Read the Pocketa case study', target: 'pocketa' },
+          { type: 'book_call', label: 'Discuss fintech work' },
+        ]
       );
     } else if (q.includes('hackathon') || q.includes('award') || q.includes('win') || q.includes('qualityhub') || q.includes('babasika')) {
       addDialogue(
         raw,
-        'I won 1st Runner Up (out of 14 teams) at UNILAG SERVICOM for QualityHub, and an Honourable Mention at the BuildVerse Hackathon for BabaSika!',
-        [{ type: 'awards', label: 'Inspect Awards' }]
+        'I won 1st Runner Up (out of 14 teams) at UNILAG QAS & SERVICOM for QualityHub, and an Honourable Mention plus ₦100,000 at the BuildVerse Hackathon for BabaSika!',
+        [
+          { type: 'awards', label: 'Open QualityHub', target: 'qualityhub' },
+          { type: 'view_project', label: 'Open BabaSika', target: 'babasika' },
+        ]
       );
     } else if (q.includes('rate') || q.includes('price') || q.includes('cost') || q.includes('timeline')) {
       addDialogue(
         raw,
         'I work on sprint-based pricing for design engineering builds, and monthly retainers for senior product design roles. Let’s discuss your scope!',
-        [{ type: 'book_call', label: 'Get a Project Estimate' }]
+        [{ type: 'book_call', label: 'Get a project estimate' }]
       );
     } else {
       addDialogue(
         raw,
         'I design end-to-end products in Figma and ship functional code in React/TypeScript. What specific problem are you looking to solve?',
         [
-          { type: 'view_cv', label: 'View Résumé' },
-          { type: 'book_call', label: 'Let’s Talk' },
+          { type: 'view_cv', label: 'View résumé' },
+          { type: 'book_call', label: 'Let’s talk' },
         ]
       );
     }
@@ -194,14 +187,14 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto bg-[#18191E] rounded-[3.4rem] p-3 sm:p-3.5 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] border-4 border-[#27282F] text-[#141618] font-sans relative select-none">
+    <div className="w-full max-w-sm mx-auto bg-[#18191E] rounded-[3.4rem] p-3 sm:p-3.5 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] border-4 border-[#27282F] text-[#141618] font-sans relative">
       {/* Side Hardware Buttons Indications */}
-      <div className="absolute -left-[7px] top-24 w-[3px] h-10 bg-[#3F3F46] rounded-l-xs" />
-      <div className="absolute -left-[7px] top-38 w-[3px] h-12 bg-[#3F3F46] rounded-l-xs" />
-      <div className="absolute -right-[7px] top-28 w-[3px] h-14 bg-[#3F3F46] rounded-r-xs" />
+      <div aria-hidden="true" className="absolute -left-[7px] top-24 w-[3px] h-10 bg-[#3F3F46] rounded-l-xs" />
+      <div aria-hidden="true" className="absolute -left-[7px] top-38 w-[3px] h-12 bg-[#3F3F46] rounded-l-xs" />
+      <div aria-hidden="true" className="absolute -right-[7px] top-28 w-[3px] h-14 bg-[#3F3F46] rounded-r-xs" />
 
       {/* Top Status Bar with Dynamic Island */}
-      <div className="relative px-5 pt-1 pb-1 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+      <div aria-hidden="true" className="relative px-5 pt-1 pb-1 flex items-center justify-between text-[11px] font-mono text-zinc-400">
         <span className="font-semibold text-zinc-300">09:41</span>
         
         {/* Dynamic Island pill */}
@@ -233,20 +226,23 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
             {/* Real circular profile photograph */}
             <div className="w-9 h-9 rounded-full overflow-hidden border border-[#D5CEBF] bg-[#141618] shrink-0 shadow-xs ring-1 ring-black/10">
               <img
-                src="/assets/aistudio/IMG_9969_f5884aae.jpeg"
-                alt="The UX Forger"
-                className="w-full h-full object-cover object-top"
+                src="/assets/photos/avatar.webp"
+                alt=""
+                width={36}
+                height={36}
+                loading="lazy"
+                className="w-full h-full object-cover"
               />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h4 className="font-display font-extrabold text-xs tracking-tight text-[#141618]">
+                <p className="font-display font-extrabold text-xs tracking-tight text-[#141618]">
                   The UX Forger
-                </h4>
+                </p>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#2FA06A] animate-pulse" />
               </div>
-              <p className="text-[10px] font-mono text-[#71717A]">
-                ★ 5.0 · 10+ Shipped Builds
+              <p className="text-[10px] font-mono text-ink-3">
+                Usually replies within a day
               </p>
             </div>
           </div>
@@ -260,7 +256,9 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
         <div
           ref={chatScrollRef}
           tabIndex={0}
-          aria-label="Interactive chat transcript"
+          aria-label="Chat with The UX Forger"
+          aria-live="polite"
+          role="log"
           className="relative z-10 flex-1 space-y-3 overflow-y-auto pr-1 py-1 text-xs scroll-smooth focus:outline-none"
           style={{ scrollbarWidth: 'thin' }}
         >
@@ -279,7 +277,7 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                 className={`max-w-[85%] p-3.5 rounded-2xl shadow-xs text-xs leading-relaxed ${
                   msg.sender === 'user'
                     ? 'bg-[#141618] text-white rounded-br-xs'
-                    : 'bg-[#EE5828] text-white rounded-bl-xs font-medium shadow-sm'
+                    : 'bg-coral-ink text-white rounded-bl-xs font-medium shadow-sm'
                 }`}
               >
                 <p>{msg.text}</p>
@@ -290,6 +288,7 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                     {msg.actions.map((act) => (
                       <button
                         key={act.label}
+                        type="button"
                         onClick={() => handleActionClick(act)}
                         className="w-full py-2 px-3 bg-white text-[#141618] hover:bg-[#FAF7F2] font-display font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition-all cursor-pointer group"
                       >
@@ -301,7 +300,7 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                 )}
               </div>
 
-              <span className="text-[9px] font-mono text-[#8A8275] mt-1 px-1">
+              <span className="text-[9px] font-mono text-[#6B6358] mt-1 px-1">
                 {msg.sender === 'user' ? 'You' : 'The UX Forger'} · {msg.timestamp}
               </span>
             </motion.div>
@@ -309,8 +308,9 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
 
           {isTyping && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              aria-label="The UX Forger is typing"
               className="flex items-center gap-1 px-3 py-2 bg-white rounded-2xl w-14 border border-[#E0D8C7] shadow-xs"
             >
               <div className="w-1.5 h-1.5 bg-[#EE5828] rounded-full animate-bounce" />
@@ -322,7 +322,7 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
 
         {/* Suggested Quick Prompt Chips (reference image 1 style) */}
         <div className="relative z-10 pt-2 pb-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+          <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Suggested questions">
             <button
               onClick={() =>
                 addDialogue(
@@ -331,9 +331,26 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                   [{ type: 'book_call', label: 'Book a call' }]
                 )
               }
-              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#EE5828] text-[#EE5828] hover:text-white border border-[#EE5828] transition-all cursor-pointer shadow-2xs"
+              type="button"
+              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-coral-ink text-coral-ink hover:text-white border border-coral-ink transition-colors shadow-2xs"
             >
               Can we hop on a call?
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                addDialogue(
+                  'What have you won?',
+                  'QualityHub took 1st Runner Up out of 14 teams at UNILAG, and BabaSika won an Honourable Mention plus ₦100,000 at BuildVerse.',
+                  [
+                    { type: 'awards', label: 'Open QualityHub', target: 'qualityhub' },
+                    { type: 'view_project', label: 'Open BabaSika', target: 'babasika' },
+                  ]
+                )
+              }
+              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#141618] text-[#141618] hover:text-white border border-[#D5CEBF] transition-colors shadow-2xs"
+            >
+              What have you won?
             </button>
             <button
               onClick={() =>
@@ -343,7 +360,8 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                   [{ type: 'book_call', label: 'Start your project' }]
                 )
               }
-              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#141618] text-[#141618] hover:text-white border border-[#D5CEBF] transition-all cursor-pointer shadow-2xs"
+              type="button"
+              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#141618] text-[#141618] hover:text-white border border-[#D5CEBF] transition-colors shadow-2xs"
             >
               I need a product designed
             </button>
@@ -355,7 +373,8 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
                   [{ type: 'view_cv', label: 'Open Résumé' }]
                 )
               }
-              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#141618] text-[#141618] hover:text-white border border-[#D5CEBF] transition-all cursor-pointer shadow-2xs"
+              type="button"
+              className="shrink-0 text-[10px] font-mono font-bold px-3 py-1 rounded-full bg-white hover:bg-[#141618] text-[#141618] hover:text-white border border-[#D5CEBF] transition-colors shadow-2xs"
             >
               Check CV & Background
             </button>
@@ -373,12 +392,12 @@ export const InteractiveChatPhone: React.FC<InteractiveChatPhoneProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Start your project with me..."
             aria-label="Ask The UX Forger a question"
-            className="flex-1 px-3.5 py-2 rounded-full bg-white border border-[#D5CEBF] text-xs text-[#141618] placeholder-[#8A8275] focus:outline-none focus:border-[#EE5828] shadow-2xs font-sans transition-all"
+            className="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-white border border-[#D5CEBF] text-base sm:text-xs text-[#141618] placeholder-[#6B6358] focus:outline-none focus-visible:outline-none focus:border-coral-ink focus:ring-2 focus:ring-coral/25 shadow-2xs font-sans transition-[border-color,box-shadow]"
           />
           <button
             type="submit"
             aria-label="Send message"
-            className="w-8 h-8 rounded-full bg-[#EE5828] hover:bg-[#D44214] text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow-xs shrink-0"
+            className="w-9 h-9 rounded-full bg-coral-ink hover:bg-[#9A3818] text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-xs shrink-0"
           >
             <ArrowRight className="w-4 h-4" />
           </button>

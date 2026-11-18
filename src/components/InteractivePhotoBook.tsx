@@ -1,474 +1,405 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Minimize2,
-  X,
-  Camera,
-  Sparkles,
-  MapPin,
-  Calendar,
-  Layers,
-  Quote,
-} from 'lucide-react';
-import { BOOK_CHAPTERS, BookChapter } from '../data/portfolioData';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useInView, Variants } from 'motion/react';
+import { BookOpen, Calendar, ChevronLeft, ChevronRight, MapPin, Maximize2, Minimize2, Quote, X } from 'lucide-react';
+import { BOOK_CHAPTERS } from '../data/portfolioData';
 import { sounds } from '../utils/audio';
+import { sizeOf } from '../data/imageSizes';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { EASE_OUT, SPRING_SOFT } from '../utils/motion';
 
-interface InteractivePhotoBookProps {
-  onOpenChange?: (isOpen: boolean) => void;
-}
+const TOTAL = BOOK_CHAPTERS.length;
+const pad = (n: number) => String(n).padStart(2, '0');
 
-export const InteractivePhotoBook: React.FC<InteractivePhotoBookProps> = ({
-  onOpenChange,
-}) => {
+// Direction-aware page turn: pages swing around the spine with perspective
+const pageVariants: Variants = {
+  enter: (dir: number) => ({ opacity: 0, rotateY: dir > 0 ? 28 : -28, x: dir > 0 ? 60 : -60, scale: 0.98 }),
+  center: { opacity: 1, rotateY: 0, x: 0, scale: 1, transition: { duration: 0.5, ease: EASE_OUT } },
+  exit: (dir: number) => ({
+    opacity: 0,
+    rotateY: dir > 0 ? -22 : 22,
+    x: dir > 0 ? -50 : 50,
+    scale: 0.98,
+    transition: { duration: 0.26, ease: [0.4, 0, 1, 1] },
+  }),
+};
+
+const isTypingTarget = (el: EventTarget | null) =>
+  el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+
+export const InteractivePhotoBook: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [turnDirection, setTurnDirection] = useState<'next' | 'prev' | null>(null);
-  const bookContainerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const spreadRef = useRef<HTMLDivElement>(null);
+  const coverRef = useRef<HTMLButtonElement>(null);
+  const inView = useInView(rootRef, { amount: 0.3 });
 
-  const activeChapter: BookChapter = BOOK_CHAPTERS[activeIndex];
-  const totalChapters = BOOK_CHAPTERS.length;
+  const chapter = BOOK_CHAPTERS[index];
+  const imgSize = sizeOf(chapter.image);
 
-  const handleOpenBook = () => {
+  useScrollLock(isFullscreen);
+  useFocusTrap(spreadRef, isFullscreen, { onEscape: () => setIsFullscreen(false) });
+
+  const open = () => {
     sounds.playPop(0.9);
     setIsOpen(true);
-    onOpenChange?.(true);
   };
 
-  const handleCloseBook = () => {
+  const close = useCallback(() => {
     sounds.playPop(0.8);
-    setIsOpen(false);
     setIsFullscreen(false);
-    onOpenChange?.(false);
-  };
+    setIsOpen(false);
+    requestAnimationFrame(() => coverRef.current?.focus({ preventScroll: true }));
+  }, []);
 
-  const handleNext = () => {
-    if (activeIndex < totalChapters - 1) {
-      sounds.playPop(1.1);
-      setTurnDirection('next');
-      setActiveIndex((prev) => prev + 1);
-    }
-  };
+  const goTo = useCallback(
+    (next: number) => {
+      if (next < 0 || next >= TOTAL || next === index) return;
+      sounds.playWhoosh();
+      setDirection(next > index ? 1 : -1);
+      setIndex(next);
+    },
+    [index],
+  );
 
-  const handlePrev = () => {
-    if (activeIndex > 0) {
-      sounds.playPop(1.0);
-      setTurnDirection('prev');
-      setActiveIndex((prev) => prev - 1);
-    }
-  };
-
-  const handleSelectChapter = (idx: number) => {
-    if (idx === activeIndex) return;
-    sounds.playPop(1.05);
-    setTurnDirection(idx > activeIndex ? 'next' : 'prev');
-    setActiveIndex(idx);
-  };
-
-  // Keyboard navigation when book is open
+  // Arrow keys turn pages while the book is open and on screen (never while typing elsewhere)
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!isFullscreen && !inView) return;
       if (e.key === 'ArrowRight') {
-        handleNext();
+        e.preventDefault();
+        goTo(index + 1);
       } else if (e.key === 'ArrowLeft') {
-        handlePrev();
-      } else if (e.key === 'Escape') {
-        if (isFullscreen) {
-          setIsFullscreen(false);
-        } else {
-          handleCloseBook();
-        }
+        e.preventDefault();
+        goTo(index - 1);
+      } else if (e.key === 'Escape' && !isFullscreen && rootRef.current?.contains(document.activeElement)) {
+        close();
       }
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, isFullscreen, inView, index, goTo, close]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, activeIndex, isFullscreen]);
-
-  // Touch swipe support
-  const touchStartX = useRef<number | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+  // Swipe to turn on touch screens
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    if (deltaX < -50) {
-      handleNext();
-    } else if (deltaX > 50) {
-      handlePrev();
-    }
-    touchStartX.current = null;
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) goTo(dx < 0 ? index + 1 : index - 1);
+    touchStart.current = null;
   };
 
   return (
     <div
-      ref={bookContainerRef}
-      className={`w-full transition-all duration-300 ${
+      ref={rootRef}
+      className={
         isFullscreen
-          ? 'fixed inset-0 z-50 bg-[#141618]/90 backdrop-blur-md p-3 sm:p-6 flex flex-col items-center justify-center overflow-y-auto'
-          : 'relative my-8'
-      }`}
+          ? 'fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-ink/90 p-3 backdrop-blur-sm sm:p-6'
+          : 'relative mt-10'
+      }
     >
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         {!isOpen ? (
-          /* ===================================================================
-             1. CLOSED BOOK STATE — EDITORIAL HARDCOVER MONOGRAPH
-             =================================================================== */
+          /* ---------------- Closed: hardcover ---------------- */
           <motion.div
-            key="closed-book"
-            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            key="cover"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
-            transition={{ duration: 0.3 }}
-            onClick={handleOpenBook}
-            className="w-full max-w-xl mx-auto cursor-pointer group select-none"
-            role="button"
-            tabIndex={0}
-            aria-label="Open The Person Behind The Work photo book"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleOpenBook();
-              }
-            }}
+            exit={{ opacity: 0, scale: 0.94, rotateY: -12, transition: { duration: 0.25 } }}
+            transition={SPRING_SOFT}
+            className="mx-auto w-full max-w-xl [perspective:1400px]"
           >
-            {/* 3D Physical Book Illusion with Spine & Edge Stack */}
-            <div className="relative">
-              {/* Paper Stack Edge Behind (Pages illusion on right/bottom) */}
-              <div className="absolute -right-2.5 top-2.5 bottom-2.5 w-4 bg-[#F2ECE1] rounded-r-md border border-[#D5CEBF] shadow-xs flex flex-col justify-around py-2 px-0.5">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-px bg-[#DCD4C4] w-full" />
+            <button
+              ref={coverRef}
+              type="button"
+              onClick={open}
+              aria-label="Open the photo book: The person behind the work"
+              className="group relative block w-full text-left"
+            >
+              {/* Page edges */}
+              <span aria-hidden="true" className="absolute -right-2.5 bottom-2.5 top-2.5 flex w-4 flex-col justify-around rounded-r-md border border-line bg-[#F2ECE1] px-0.5 py-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span key={i} className="h-px w-full bg-[#DCD4C4]" />
                 ))}
-              </div>
-              <div className="absolute -bottom-2 left-3 right-1 h-3 bg-[#E8E1D3] rounded-b-md border-b border-[#D5CEBF] shadow-sm" />
+              </span>
+              <span aria-hidden="true" className="absolute -bottom-2 left-3 right-1 h-3 rounded-b-md border-b border-line bg-[#E8E1D3]" />
 
-              {/* Hardcover Outer Frame */}
-              <div className="relative bg-[#1A1D20] text-[#FAF7F2] rounded-2xl border-[3.5px] border-[#141618] p-6 sm:p-10 shadow-[10px_14px_0px_#141618] transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[12px_18px_0px_#141618] overflow-hidden">
-                {/* Book Spine Bevel (Left edge gradient) */}
-                <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/60 via-black/20 to-transparent pointer-events-none" />
-                <div className="absolute inset-y-0 left-6 w-px bg-white/10 pointer-events-none" />
-
-                {/* Cover Texture Subtle Grid */}
-                <div
-                  className="absolute inset-0 opacity-5 pointer-events-none"
-                  style={{
-                    backgroundImage: 'radial-gradient(#FFFFFF 1px, transparent 1px)',
-                    backgroundSize: '16px 16px',
-                  }}
+              <span className="relative block overflow-hidden rounded-2xl border-[3.5px] border-ink bg-[#1A1D20] p-6 text-paper-2 shadow-[10px_14px_0_#141618] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1 group-hover:shadow-[12px_18px_0_#141618] sm:p-10">
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-6 w-px bg-white/10" />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 opacity-[0.05]"
+                  style={{ backgroundImage: 'radial-gradient(#FFFFFF 1px, transparent 1px)', backgroundSize: '16px 16px' }}
                 />
 
-                {/* Monograph Header */}
-                <div className="flex items-center justify-between border-b border-white/15 pb-4 mb-8">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#F4BE24]" />
-                    <span className="text-[11px] font-mono tracking-widest uppercase text-white/70">
-                      Editorial Monograph · Vol. 01
+                <span className="mb-8 flex items-center justify-between border-b border-white/15 pb-4">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-sun" />
+                    <span className="font-mono text-[11px] uppercase tracking-widest text-white/75">
+                      Editorial monograph · Vol. 01
                     </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-white/50">7 Chapters</span>
-                </div>
+                  </span>
+                  <span className="font-mono text-[11px] text-white/65">{TOTAL} chapters</span>
+                </span>
 
-                {/* Author Vignette & Title Group */}
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 text-center sm:text-left">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-[2.5px] border-[#F4BE24] shadow-md shrink-0 ring-4 ring-black/40">
-                    <img
-                      src="/assets/aistudio/IMG_2086_3ecf5b10.jpeg"
-                      alt="Opeyemi - The UX Forger"
-                      className="w-full h-full object-cover object-top"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#F4BE24]/20 border border-[#F4BE24]/40 text-[#F4BE24] text-[10px] font-mono font-bold tracking-wider uppercase">
-                      Interactive Photo Book
-                    </div>
-                    <h3 className="text-2xl sm:text-4xl font-display font-black tracking-tight leading-tight text-white">
+                <span className="mb-8 flex flex-col items-center gap-6 text-center sm:flex-row sm:items-start sm:text-left">
+                  <img
+                    src="/assets/photos/founder.webp"
+                    alt=""
+                    width={96}
+                    height={96}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-20 w-20 shrink-0 rounded-full border-[2.5px] border-sun object-cover object-top shadow-md ring-4 ring-black/40 sm:h-24 sm:w-24"
+                  />
+                  <span className="space-y-2">
+                    <span className="inline-block rounded-full border border-sun/40 bg-sun/20 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-sun">
+                      Interactive photo book
+                    </span>
+                    <span className="block font-display text-2xl font-black leading-tight tracking-tight text-white sm:text-4xl">
                       THE PERSON BEHIND THE WORK
-                    </h3>
-                    <p className="text-xs sm:text-sm text-white/75 font-sans leading-relaxed max-w-sm">
+                    </span>
+                    <span className="block max-w-sm text-sm leading-relaxed text-white/80">
                       A collection of moments, experiences, and everything in between.
-                    </p>
-                  </div>
-                </div>
+                    </span>
+                  </span>
+                </span>
 
-                {/* Cover Details & Invitation */}
-                <div className="pt-4 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-xs font-mono text-white/70">
-                    <span className="text-white/40">Curated by</span>{' '}
-                    <span className="font-bold text-white">Opeyemi</span> · The UX Forger
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F4BE24] text-[#141618] font-mono font-bold text-xs shadow-md group-hover:scale-105 transition-transform">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Open Photo Book ↗</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-center text-xs font-mono text-[#71717A] mt-3">
-              Click anywhere on the book to open the interactive two-page spread.
-            </p>
+                <span className="flex flex-col items-center justify-between gap-4 border-t border-white/15 pt-4 sm:flex-row">
+                  <span className="font-mono text-xs text-white/75">
+                    Curated by <span className="font-bold text-white">Opeyemi</span> · The UX Forger
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-sun px-4 py-2 font-mono text-xs font-bold text-ink shadow-md transition-transform group-hover:scale-105">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Open photo book
+                  </span>
+                </span>
+              </span>
+            </button>
           </motion.div>
         ) : (
-          /* ===================================================================
-             2. OPEN BOOK SPREAD — TWO-PAGE EDITORIAL SPREAD
-             =================================================================== */
+          /* ---------------- Open: two-page spread ---------------- */
           <motion.div
-            key="open-book"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ duration: 0.3 }}
-            className={`w-full ${
+            key="spread"
+            ref={spreadRef}
+            role={isFullscreen ? 'dialog' : 'region'}
+            aria-modal={isFullscreen || undefined}
+            aria-label={`Photo book, ${chapter.chapterNumber}: ${chapter.title}`}
+            initial={{ opacity: 0, scale: 0.96, rotateX: 8 }}
+            animate={{ opacity: 1, scale: 1, rotateX: 0 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
+            transition={SPRING_SOFT}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            className={`mx-auto flex w-full flex-col overflow-hidden rounded-3xl border-[3px] border-ink bg-paper-2 shadow-[10px_14px_0_#141618] ${
               isFullscreen ? 'max-w-6xl' : 'max-w-5xl'
-            } mx-auto bg-[#FAF7F2] rounded-3xl border-[3px] border-[#141618] shadow-[10px_14px_0px_#141618] overflow-hidden flex flex-col`}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
+            }`}
           >
-            {/* Top Reader Controls Bar */}
-            <div className="px-5 py-3.5 bg-[#EFE9DC] border-b-2 border-[#141618] flex items-center justify-between gap-3 text-xs font-mono">
-              <div className="flex items-center gap-2 text-[#141618] font-bold">
-                <BookOpen className="w-4 h-4 text-[#EE5828]" />
-                <span className="hidden sm:inline">THE PERSON BEHIND THE WORK</span>
-                <span className="sm:hidden">Photo Book</span>
-                <span className="text-[#8A8275]">·</span>
-                <span className="text-[#EE5828] font-extrabold">
-                  {activeChapter.chapterNumber} of 07
+            {/* Reader controls */}
+            <div className="flex items-center justify-between gap-3 border-b-2 border-ink bg-[#EFE9DC] px-4 py-3 font-mono text-xs sm:px-5">
+              <div className="flex min-w-0 items-center gap-2 font-bold text-ink">
+                <BookOpen className="h-4 w-4 shrink-0 text-coral-ink" aria-hidden="true" />
+                <span className="hidden truncate sm:inline">THE PERSON BEHIND THE WORK</span>
+                <span className="sm:hidden">Photo book</span>
+                <span className="text-[#8A8275]" aria-hidden="true">·</span>
+                <span className="whitespace-nowrap font-extrabold text-coral-ink" aria-live="polite">
+                  {pad(index + 1)} / {pad(TOTAL)}
                 </span>
               </div>
 
-              {/* Action Buttons: Prev, Next, Fullscreen, Close */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
-                  onClick={handlePrev}
-                  disabled={activeIndex === 0}
+                  type="button"
+                  onClick={() => goTo(index - 1)}
+                  disabled={index === 0}
                   aria-label="Previous chapter"
-                  className="p-1.5 rounded-lg border border-[#141618] bg-white hover:bg-[#FAF7F2] disabled:opacity-30 disabled:cursor-not-allowed text-[#141618] cursor-pointer transition-colors shadow-xs"
+                  className="rounded-lg border border-ink bg-white p-1.5 text-ink shadow-xs transition-[background-color,transform] hover:bg-paper-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-
-                <span className="text-[11px] font-bold text-[#52525B] px-1">
-                  {activeIndex + 1} / {totalChapters}
-                </span>
-
                 <button
-                  onClick={handleNext}
-                  disabled={activeIndex === totalChapters - 1}
+                  type="button"
+                  onClick={() => goTo(index + 1)}
+                  disabled={index === TOTAL - 1}
                   aria-label="Next chapter"
-                  className="p-1.5 rounded-lg border border-[#141618] bg-white hover:bg-[#FAF7F2] disabled:opacity-30 disabled:cursor-not-allowed text-[#141618] cursor-pointer transition-colors shadow-xs"
+                  className="rounded-lg border border-ink bg-white p-1.5 text-ink shadow-xs transition-[background-color,transform] hover:bg-paper-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
-
-                <div className="h-4 w-px bg-[#D5CEBF] mx-1" />
-
+                <span className="mx-0.5 h-4 w-px bg-line" aria-hidden="true" />
                 <button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-                  className="p-1.5 rounded-lg border border-[#141618] bg-white hover:bg-[#FAF7F2] text-[#141618] cursor-pointer transition-colors shadow-xs"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  type="button"
+                  onClick={() => setIsFullscreen((v) => !v)}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Read in fullscreen'}
+                  className="hidden rounded-lg border border-ink bg-white p-1.5 text-ink shadow-xs transition-colors hover:bg-paper-2 sm:block"
                 >
-                  {isFullscreen ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
-
                 <button
-                  onClick={handleCloseBook}
+                  type="button"
+                  onClick={close}
                   aria-label="Close photo book"
-                  className="px-3 py-1.5 rounded-lg border border-[#141618] bg-[#EE5828] hover:bg-[#DC4B1D] text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                  className="flex items-center gap-1 rounded-lg border border-ink bg-coral-ink px-2.5 py-1.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#9A3818]"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Close</span>
                 </button>
               </div>
             </div>
 
-            {/* The Two-Page Spread Container — Fixed Size Monograph */}
-            <div className="relative grid grid-cols-1 md:grid-cols-2 bg-[#FCFBF7] md:h-[620px] overflow-hidden">
-              {/* Central Spine Paper Shadow (Desktop only) */}
-              <div className="hidden md:block absolute inset-y-0 left-1/2 -translate-x-1/2 w-12 bg-gradient-to-r from-transparent via-black/8 to-transparent pointer-events-none z-20" />
-              <div className="hidden md:block absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-[#E4DDD0] pointer-events-none z-20" />
+            {/* Spread */}
+            <div className="relative overflow-hidden bg-[#FCFBF7] [perspective:1800px]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-20 hidden w-12 -translate-x-1/2 bg-gradient-to-r from-transparent via-black/[0.07] to-transparent md:block" />
+              <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 z-20 hidden w-px -translate-x-1/2 bg-[#E4DDD0] md:block" />
 
-              {/* -------------------------------------------------------------
-                  LEFT PAGE: THE EDITORIAL NARRATIVE & STORY
-                  ------------------------------------------------------------- */}
-              <div className="p-6 sm:p-8 md:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-[#EFE9DC] relative md:h-full overflow-hidden">
-                {/* Content Container */}
-                <div className="space-y-3 sm:space-y-3.5 overflow-hidden">
-                  {/* Chapter Kicker & Metadata */}
-                  <div className="flex items-center justify-between text-xs font-mono text-[#71717A] border-b border-[#EFE9DC] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: activeChapter.accentColor }}
-                      />
-                      <span className="font-bold text-[#141618] uppercase tracking-wider">
-                        {activeChapter.chapterNumber}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-[#8A8275]" />
-                        <span>{activeChapter.year}</span>
-                      </span>
-                      {activeChapter.location && (
-                        <span className="hidden sm:flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-[#8A8275]" />
-                          <span>{activeChapter.location}</span>
+              <AnimatePresence mode="wait" custom={direction} initial={false}>
+                <motion.div
+                  key={chapter.id}
+                  custom={direction}
+                  variants={pageVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  style={{ transformOrigin: direction > 0 ? 'left center' : 'right center' }}
+                  className="grid grid-cols-1 md:h-[620px] md:grid-cols-2"
+                >
+                  {/* Left page: story */}
+                  <div className="flex min-h-0 flex-col border-b border-[#EFE9DC] md:border-b-0 md:border-r">
+                    <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain p-6 sm:p-8 md:p-10 md:pb-8 md:[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)]">
+                      <div className="flex items-center justify-between border-b border-[#EFE9DC] pb-2.5 font-mono text-xs text-ink-3">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chapter.accentColor }} />
+                          <span className="font-bold uppercase tracking-wider text-ink">{chapter.chapterNumber}</span>
                         </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Chapter Title & Subtitle */}
-                  <div>
-                    <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-[#141618] tracking-tight leading-tight">
-                      {activeChapter.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm font-mono font-medium text-[#71717A] mt-0.5">
-                      {activeChapter.subtitle}
-                    </p>
-                  </div>
-
-                  {/* Editorial Pull Quote */}
-                  {activeChapter.quote && (
-                    <div className="relative pl-3.5 border-l-3 border-[#141618] bg-[#FAF7F2] p-2.5 rounded-r-xl">
-                      <Quote className="w-3.5 h-3.5 text-[#8A8275] absolute -top-1.5 -left-1.5 opacity-60" />
-                      <p className="text-xs sm:text-sm italic font-serif text-[#27272A] leading-relaxed">
-                        &ldquo;{activeChapter.quote}&rdquo;
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Personal Story Paragraph */}
-                  <p className="text-xs sm:text-sm font-sans text-[#3F3F46] leading-relaxed line-clamp-4 sm:line-clamp-5">
-                    {activeChapter.story}
-                  </p>
-
-                  {/* Reflections / Key Highlights */}
-                  <div className="space-y-1 pt-1">
-                    <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#71717A]">
-                      Key Highlights &amp; Insights:
-                    </div>
-                    {activeChapter.reflections.slice(0, 3).map((ref, rIdx) => (
-                      <div
-                        key={rIdx}
-                        className="flex items-start gap-2 text-xs text-[#27272A]"
-                      >
-                        <span
-                          className="font-bold leading-none mt-0.5 shrink-0"
-                          style={{ color: activeChapter.accentColor }}
-                        >
-                          →
+                        <span className="flex items-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" aria-hidden="true" />
+                            {chapter.year}
+                          </span>
+                          {chapter.location && (
+                            <span className="hidden items-center gap-1 sm:flex">
+                              <MapPin className="h-3 w-3" aria-hidden="true" />
+                              {chapter.location}
+                            </span>
+                          )}
                         </span>
-                        <span className="line-clamp-1">{ref}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Left Page Footer: Tags & Page Number */}
-                <div className="pt-4 mt-4 border-t border-[#EFE9DC] flex items-center justify-between gap-3 text-xs font-mono text-[#8A8275] shrink-0">
-                  <div className="flex flex-wrap gap-1.5 min-w-0">
-                    {activeChapter.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-md bg-[#FAF7F2] border border-[#EFE9DC] text-[10px] text-[#52525B] whitespace-nowrap"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="font-bold text-[#141618] whitespace-nowrap shrink-0">
-                    Page {activeIndex * 2 + 1}
-                  </span>
-                </div>
-              </div>
+                      <div>
+                        <h4 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-ink sm:text-3xl">
+                          {chapter.title}
+                        </h4>
+                        <p className="mt-0.5 font-mono text-xs font-medium text-ink-3 sm:text-sm">{chapter.subtitle}</p>
+                      </div>
 
-              {/* -------------------------------------------------------------
-                  RIGHT PAGE: THE VISUAL MEDIA / STAGE PHOTO / EDITORIAL NOTE
-                  ------------------------------------------------------------- */}
-              <div className="p-6 sm:p-8 md:p-10 flex flex-col justify-between bg-[#FDFCFA] relative md:h-full overflow-hidden">
-                <div className="h-full flex flex-col justify-center">
-                  {activeChapter.image && (
-                    <div className="space-y-3">
-                      <div className="relative rounded-2xl overflow-hidden border-[2.5px] border-[#141618] shadow-[5px_5px_0px_#141618] bg-[#141618] h-64 sm:h-72 md:h-[330px] w-full">
+                      {chapter.quote && (
+                        <blockquote className="relative rounded-r-xl border-l-[3px] border-ink bg-paper-2 p-3 pl-4">
+                          <Quote className="absolute -left-2 -top-2 h-4 w-4 text-[#8A8275]" aria-hidden="true" />
+                          <p className="font-serif text-sm italic leading-relaxed text-ink-2">&ldquo;{chapter.quote}&rdquo;</p>
+                        </blockquote>
+                      )}
+
+                      <p className="text-sm leading-relaxed text-ink-2">{chapter.story}</p>
+
+                      <div className="space-y-1.5 pt-1">
+                        <h5 className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                          Highlights
+                        </h5>
+                        <ul className="space-y-1.5">
+                          {chapter.reflections.map((r) => (
+                            <li key={r} className="flex items-start gap-2 text-xs leading-relaxed text-ink-2 sm:text-[13px]">
+                              <span className="mt-px shrink-0 font-bold" style={{ color: chapter.accentColor }} aria-hidden="true">
+                                →
+                              </span>
+                              <span>{r}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#EFE9DC] px-6 py-3 font-mono text-xs text-[#6B6358] sm:px-8 md:px-10">
+                      <ul className="flex min-w-0 flex-wrap gap-1.5">
+                        {chapter.tags.slice(0, 3).map((tag) => (
+                          <li key={tag} className="whitespace-nowrap rounded-md border border-[#EFE9DC] bg-paper-2 px-2 py-0.5 text-[10px] text-ink-3">
+                            {tag}
+                          </li>
+                        ))}
+                      </ul>
+                      <span className="shrink-0 whitespace-nowrap font-bold text-ink">Page {index * 2 + 1}</span>
+                    </div>
+                  </div>
+
+                  {/* Right page: photo */}
+                  <div className="flex min-h-0 flex-col bg-[#FDFCFA]">
+                    <figure className="flex flex-1 flex-col justify-center gap-3 p-6 sm:p-8 md:p-10">
+                      <div className="relative h-64 w-full overflow-hidden rounded-2xl border-[2.5px] border-ink bg-ink shadow-[5px_5px_0_#141618] sm:h-80 md:h-[340px]">
                         <img
-                          src={activeChapter.image}
-                          alt={activeChapter.title}
-                          className={`w-full h-full ${
-                            activeChapter.imageFit === 'contain'
-                              ? 'object-contain object-center bg-[#141618]'
-                              : `${activeChapter.imagePosition || 'object-center'} object-cover`
+                          src={chapter.image}
+                          alt={chapter.imageCaption}
+                          width={imgSize?.w}
+                          height={imgSize?.h}
+                          loading="lazy"
+                          decoding="async"
+                          className={`h-full w-full ${
+                            chapter.imageFit === 'contain'
+                              ? 'object-contain object-center'
+                              : `object-cover ${chapter.imagePosition || 'object-center'}`
                           }`}
                         />
-
-                        {/* Event Watermark Pill */}
-                        {activeChapter.eventOrContext && (
-                          <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/85 backdrop-blur-sm rounded-lg border border-white/20 text-white text-[11px] font-mono font-bold z-10 shadow-sm">
-                            {activeChapter.eventOrContext}
-                          </div>
+                        {chapter.eventOrContext && (
+                          <span className="absolute bottom-3 left-3 z-10 rounded-lg border border-white/20 bg-black/85 px-3 py-1 font-mono text-[11px] font-bold text-white shadow-sm">
+                            {chapter.eventOrContext}
+                          </span>
                         )}
                       </div>
-
-                      {/* Photo Caption */}
-                      {activeChapter.imageCaption && (
-                        <p className="text-xs font-mono text-[#52525B] leading-relaxed italic px-1 h-11 flex items-center line-clamp-2">
-                          ↳ {activeChapter.imageCaption}
-                        </p>
-                      )}
+                      <figcaption className="px-1 font-mono text-xs italic leading-relaxed text-ink-3">
+                        ↳ {chapter.imageCaption}
+                      </figcaption>
+                    </figure>
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#EFE9DC] px-6 py-3 font-mono text-xs text-[#6B6358] sm:px-8 md:px-10">
+                      <span className="truncate text-[11px]">The UX Forger monograph</span>
+                      <span className="shrink-0 font-bold text-ink">Page {index * 2 + 2}</span>
                     </div>
-                  )}
-                </div>
-
-                {/* Right Page Footer */}
-                <div className="pt-4 mt-4 border-t border-[#EFE9DC] flex items-center justify-between gap-3 text-xs font-mono text-[#8A8275] shrink-0">
-                  <span className="text-[11px] truncate">The UX Forger Monograph</span>
-                  <span className="font-bold text-[#141618] whitespace-nowrap shrink-0">
-                    Page {activeIndex * 2 + 2}
-                  </span>
-                </div>
-              </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
             </div>
 
-            {/* Bottom Chapter Selector Thumbnail Ribbon */}
-            <div className="px-4 py-3 bg-[#FAF7F2] border-t-2 border-[#141618] flex items-center gap-2 overflow-x-auto select-none">
-              <span className="text-[10px] font-mono font-bold uppercase text-[#8A8275] shrink-0 pl-2">
-                Chapters:
-              </span>
-              {BOOK_CHAPTERS.map((ch, idx) => {
-                const isActive = idx === activeIndex;
+            {/* Chapter ribbon */}
+            <nav aria-label="Chapters" className="no-scrollbar flex items-center gap-2 overflow-x-auto border-t-2 border-ink bg-paper-2 px-4 py-3">
+              <span className="shrink-0 pl-1 font-mono text-[10px] font-bold uppercase text-[#6B6358]">Chapters</span>
+              {BOOK_CHAPTERS.map((ch, i) => {
+                const active = i === index;
                 return (
                   <button
                     key={ch.id}
-                    onClick={() => handleSelectChapter(idx)}
-                    className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isActive
-                        ? 'bg-[#141618] text-white shadow-xs'
-                        : 'bg-white hover:bg-[#EFE9DC] text-[#52525B] border border-[#D5CEBF]'
+                    type="button"
+                    onClick={() => goTo(i)}
+                    aria-current={active ? 'step' : undefined}
+                    className={`relative flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 font-mono text-xs font-bold transition-colors ${
+                      active ? 'text-white' : 'border border-line bg-white text-ink-3 hover:bg-[#EFE9DC]'
                     }`}
                   >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: ch.accentColor }}
-                    />
-                    <span>{ch.title}</span>
+                    {active && (
+                      <motion.span layoutId="book-chapter-pill" className="absolute inset-0 rounded-xl bg-ink" transition={SPRING_SOFT} />
+                    )}
+                    <span className="relative h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ch.accentColor }} />
+                    <span className="relative">{ch.title}</span>
                   </button>
                 );
               })}
-            </div>
+            </nav>
           </motion.div>
         )}
       </AnimatePresence>

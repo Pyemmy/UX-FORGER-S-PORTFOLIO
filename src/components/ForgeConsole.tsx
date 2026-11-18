@@ -1,399 +1,336 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
-  Search,
   ArrowRight,
-  ExternalLink,
-  Copy,
-  Check,
-  Download,
-  Terminal,
-  FolderGit2,
-  FileText,
-  User,
-  Sparkles,
-  Layers,
-  X,
   Compass,
+  Copy,
+  CornerDownLeft,
+  Download,
+  ExternalLink,
+  FileText,
+  FolderGit2,
+  Layers,
+  Search,
+  Sparkles,
+  User,
+  X,
 } from 'lucide-react';
-import { PERSONAL_INFO, PROJECTS } from '../data/portfolioData';
+import { PERSONAL_INFO, PROJECTS, ProjectItem } from '../data/portfolioData';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useToast } from './ui/Toast';
 
 interface ForgeConsoleProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateSection: (sectionId: string) => void;
-  onOpenProjectCaseStudy: (projectId: string) => void;
+  onOpenProject: (project: ProjectItem) => void;
   onOpenResumeModal: () => void;
 }
 
-interface CommandAction {
+type Group = 'Jump to' | 'Case studies' | 'Actions';
+
+interface Command {
   id: string;
-  group: 'EXPLORE' | 'QUICK ACTIONS' | 'LIVE PROJECTS';
+  group: Group;
   title: string;
   subtitle?: string;
+  keywords?: string;
   icon: React.ReactNode;
-  shortcut?: string;
   external?: boolean;
   run: () => void;
 }
 
-export const ForgeConsole: React.FC<ForgeConsoleProps> = ({
-  isOpen,
+const GROUPS: Group[] = ['Jump to', 'Case studies', 'Actions'];
+
+const openExternal = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
+
+const Palette: React.FC<Omit<ForgeConsoleProps, 'isOpen'>> = ({
   onClose,
   onNavigateSection,
-  onOpenProjectCaseStudy,
+  onOpenProject,
   onOpenResumeModal,
 }) => {
   const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [selected, setSelected] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { copy } = useToast();
 
-  // Focus input & lock scroll when opened
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      setQuery('');
-      setSelectedIndex(0);
-      setCopiedEmail(false);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
+  useScrollLock(true);
+  useFocusTrap(panelRef, true, { initialFocus: inputRef, onEscape: onClose });
 
-  // Copy email handler
-  const handleCopyEmail = () => {
-    navigator.clipboard?.writeText(PERSONAL_INFO.email);
-    setCopiedEmail(true);
-    setTimeout(() => {
-      setCopiedEmail(false);
+  const commands = useMemo<Command[]>(() => {
+    const go = (id: string) => () => {
       onClose();
-    }, 1200);
-  };
-
-  // Build commands
-  const liveProjects = PROJECTS.filter((p) => p.liveUrl);
-
-  const actions: CommandAction[] = [
-    // Group 1: EXPLORE
-    {
-      id: 'explore-work',
-      group: 'EXPLORE',
-      title: 'Selected Projects',
-      subtitle: 'View flagship UI/UX and product builds',
-      icon: <Layers className="w-4 h-4 text-[#1D9E75]" />,
-      run: () => {
-        onClose();
-        onNavigateSection('work');
+      // Let the palette unlock scrolling before we scroll
+      window.setTimeout(() => onNavigateSection(id), 60);
+    };
+    return [
+      { id: 'work', group: 'Jump to', title: 'Selected work', subtitle: 'Case studies and shipped builds', icon: <Layers className="h-4 w-4 text-teal" />, run: go('work') },
+      { id: 'capabilities', group: 'Jump to', title: 'Expertise', subtitle: 'What I work on', icon: <Compass className="h-4 w-4 text-teal" />, run: go('capabilities') },
+      { id: 'about', group: 'Jump to', title: 'About me', subtitle: 'Story, life off the keyboard, photo book', icon: <User className="h-4 w-4 text-teal" />, run: go('about') },
+      { id: 'experience', group: 'Jump to', title: 'Career history', subtitle: 'EcoVest, Forge Academy, Ventics AI and more', keywords: 'experience jobs', icon: <User className="h-4 w-4 text-teal" />, run: go('experience') },
+      { id: 'playground', group: 'Jump to', title: 'Playground & lab', subtitle: 'Experiments and interactive toys', keywords: 'experiments', icon: <Sparkles className="h-4 w-4 text-lime" />, run: go('playground') },
+      { id: 'contact', group: 'Jump to', title: 'Contact', subtitle: 'Email, LinkedIn, WhatsApp, X', keywords: 'hire talk', icon: <ArrowRight className="h-4 w-4 text-teal" />, run: go('contact') },
+      ...PROJECTS.map<Command>((p) => ({
+        id: `project-${p.id}`,
+        group: 'Case studies',
+        title: p.displayTitle || p.title,
+        subtitle: p.displayCategory || p.subtitle,
+        keywords: `${p.title} ${p.technologies.join(' ')} ${p.clientOrOrg}`,
+        icon: <FileText className="h-4 w-4 text-night-muted" />,
+        run: () => {
+          onClose();
+          onOpenProject(p);
+        },
+      })),
+      {
+        id: 'copy-email',
+        group: 'Actions',
+        title: 'Copy email address',
+        subtitle: PERSONAL_INFO.email,
+        icon: <Copy className="h-4 w-4 text-night-muted" />,
+        run: () => {
+          copy(PERSONAL_INFO.email, 'Email copied');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'explore-capabilities',
-      group: 'EXPLORE',
-      title: 'Core Capabilities',
-      subtitle: 'Strategy, design systems, frontend, AI workflows',
-      icon: <Compass className="w-4 h-4 text-[#1D9E75]" />,
-      run: () => {
-        onClose();
-        onNavigateSection('capabilities');
+      {
+        id: 'resume',
+        group: 'Actions',
+        title: 'View résumé',
+        subtitle: 'Experience, awards and education',
+        keywords: 'cv',
+        icon: <FileText className="h-4 w-4 text-night-muted" />,
+        run: () => {
+          onClose();
+          onOpenResumeModal();
+        },
       },
-    },
-    {
-      id: 'explore-experiments',
-      group: 'EXPLORE',
-      title: 'Engineering & AI Experiments',
-      subtitle: 'Rapid prototypes, hackathon builds, and lab explorations',
-      icon: <Sparkles className="w-4 h-4 text-[#C7F36B]" />,
-      run: () => {
-        onClose();
-        onNavigateSection('playground');
-      },
-    },
-    {
-      id: 'explore-about',
-      group: 'EXPLORE',
-      title: 'About Me & Experience',
-      subtitle: 'UNILAG Mathematics, background, and EcoVest brick stack',
-      icon: <User className="w-4 h-4 text-[#1D9E75]" />,
-      run: () => {
-        onClose();
-        onNavigateSection('experience');
-      },
-    },
-
-    // Group 2: QUICK ACTIONS
-    {
-      id: 'action-copy-email',
-      group: 'QUICK ACTIONS',
-      title: copiedEmail ? 'Email Copied to Clipboard!' : 'Copy Email Address',
-      subtitle: PERSONAL_INFO.email,
-      icon: copiedEmail ? (
-        <Check className="w-4 h-4 text-[#C7F36B]" />
-      ) : (
-        <Copy className="w-4 h-4 text-[#9BA3AF]" />
-      ),
-      run: handleCopyEmail,
-    },
-    {
-      id: 'action-resume',
-      group: 'QUICK ACTIONS',
-      title: 'Download Résumé (Official PDF)',
-      subtitle: 'Download latest verified CV document',
-      icon: <Download className="w-4 h-4 text-[#1D9E75]" />,
-      run: () => {
-        const link = document.createElement('a');
-        link.href = PERSONAL_INFO.cvPdfUrl;
-        link.download = 'Owoade_Opeyemi_Ismail_CV.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        onClose();
-      },
-    },
-    {
-      id: 'action-view-resume',
-      group: 'QUICK ACTIONS',
-      title: 'Preview Résumé Online',
-      subtitle: 'Interactive CV modal viewer',
-      icon: <FileText className="w-4 h-4 text-[#9BA3AF]" />,
-      run: () => {
-        onClose();
-        onOpenResumeModal();
-      },
-    },
-    {
-      id: 'action-linkedin',
-      group: 'QUICK ACTIONS',
-      title: 'Open LinkedIn Profile',
-      subtitle: 'linkedin.com/in/owoade-opeyemi',
-      icon: <ExternalLink className="w-4 h-4 text-[#9BA3AF]" />,
-      external: true,
-      run: () => {
-        const a = document.createElement('a');
-        a.href = PERSONAL_INFO.linkedin;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.click();
-        onClose();
-      },
-    },
-    {
-      id: 'action-github',
-      group: 'QUICK ACTIONS',
-      title: 'Open GitHub Repositories',
-      subtitle: 'github.com/theuxforger',
-      icon: <FolderGit2 className="w-4 h-4 text-[#9BA3AF]" />,
-      external: true,
-      run: () => {
-        const a = document.createElement('a');
-        a.href = PERSONAL_INFO.github;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.click();
-        onClose();
-      },
-    },
-    {
-      id: 'action-forge-academy',
-      group: 'QUICK ACTIONS',
-      title: 'Visit Forge Academy',
-      subtitle: 'Cohort training & design mentorship platform',
-      icon: <Terminal className="w-4 h-4 text-[#F26522]" />,
-      run: () => {
-        onClose();
-        onNavigateSection('experience');
-      },
-    },
-
-    // Group 3: LIVE PROJECTS
-    ...liveProjects.map((proj) => ({
-      id: `live-${proj.id}`,
-      group: 'LIVE PROJECTS' as const,
-      title: `${proj.subtitle.split(':')[0]} (${proj.title})`,
-      subtitle: `${proj.category} · ${proj.liveUrl}`,
-      icon: <ExternalLink className="w-4 h-4 text-[#1D9E75]" />,
-      external: true,
-      run: () => {
-        if (proj.liveUrl) {
+      {
+        id: 'download-cv',
+        group: 'Actions',
+        title: 'Download CV (PDF)',
+        subtitle: PERSONAL_INFO.cvFileName,
+        keywords: 'resume',
+        icon: <Download className="h-4 w-4 text-teal" />,
+        run: () => {
           const a = document.createElement('a');
-          a.href = proj.liveUrl;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
+          a.href = PERSONAL_INFO.cvPdfUrl;
+          a.download = PERSONAL_INFO.cvFileName;
           a.click();
-        }
-        onClose();
+          onClose();
+        },
       },
-    })),
-  ];
+      {
+        id: 'linkedin',
+        group: 'Actions',
+        title: 'Open LinkedIn',
+        subtitle: PERSONAL_INFO.linkedin.replace('https://', ''),
+        icon: <ExternalLink className="h-4 w-4 text-night-muted" />,
+        external: true,
+        run: () => {
+          openExternal(PERSONAL_INFO.linkedin);
+          onClose();
+        },
+      },
+      {
+        id: 'github',
+        group: 'Actions',
+        title: 'Open GitHub',
+        subtitle: PERSONAL_INFO.github.replace('https://', ''),
+        icon: <FolderGit2 className="h-4 w-4 text-night-muted" />,
+        external: true,
+        run: () => {
+          openExternal(PERSONAL_INFO.github);
+          onClose();
+        },
+      },
+      ...PROJECTS.filter((p) => p.liveUrl).map<Command>((p) => ({
+        id: `live-${p.id}`,
+        group: 'Actions',
+        title: `Open ${p.displayTitle || p.title} live`,
+        subtitle: p.liveUrl!.replace('https://', '').replace(/\/$/, ''),
+        keywords: 'demo live prototype',
+        icon: <ExternalLink className="h-4 w-4 text-night-muted" />,
+        external: true,
+        run: () => {
+          openExternal(p.liveUrl!);
+          onClose();
+        },
+      })),
+    ];
+  }, [copy, onClose, onNavigateSection, onOpenProject, onOpenResumeModal]);
 
-  // Filter actions by search query
-  const filteredActions = actions.filter((action) => {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    return (
-      action.title.toLowerCase().includes(q) ||
-      action.subtitle?.toLowerCase().includes(q) ||
-      action.group.toLowerCase().includes(q)
-    );
-  });
+  const q = query.trim().toLowerCase();
+  // Relevance: title prefix > title match > subtitle/keyword match
+  const score = (c: Command) => {
+    if (!q) return 1;
+    const title = c.title.toLowerCase();
+    if (title.startsWith(q)) return 4;
+    if (title.split(/\s+/).some((w) => w.startsWith(q))) return 3;
+    if (title.includes(q)) return 2;
+    return `${c.subtitle ?? ''} ${c.keywords ?? ''} ${c.group}`.toLowerCase().includes(q) ? 1 : 0;
+  };
+  const scored = commands.map((c) => ({ c, s: score(c) })).filter((x) => x.s > 0);
+  // Groups appear in order of their best match, items by score within a group
+  const groupOrder = q
+    ? [...GROUPS].sort(
+        (a, b) =>
+          Math.max(0, ...scored.filter((x) => x.c.group === b).map((x) => x.s)) -
+            Math.max(0, ...scored.filter((x) => x.c.group === a).map((x) => x.s)) ||
+          GROUPS.indexOf(a) - GROUPS.indexOf(b),
+      )
+    : GROUPS;
+  const ordered = groupOrder.flatMap((g) =>
+    scored
+      .filter((x) => x.c.group === g)
+      .sort((a, b) => b.s - a.s)
+      .map((x) => x.c),
+  );
 
-  // Handle keyboard navigation inside palette
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
+  useEffect(() => setSelected(0), [query]);
+
+  // Keep the highlighted row visible while arrowing through the list
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-index="${selected}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
-      onClose();
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredActions.length));
+      setSelected((s) => (ordered.length ? (s + 1) % ordered.length : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredActions.length) % Math.max(1, filteredActions.length));
+      setSelected((s) => (ordered.length ? (s - 1 + ordered.length) % ordered.length : 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredActions[selectedIndex]) {
-        filteredActions[selectedIndex].run();
-      }
+      ordered[selected]?.run();
     }
   };
 
-  // Group filtered actions
-  const groupedActions = {
-    EXPLORE: filteredActions.filter((a) => a.group === 'EXPLORE'),
-    'QUICK ACTIONS': filteredActions.filter((a) => a.group === 'QUICK ACTIONS'),
-    'LIVE PROJECTS': filteredActions.filter((a) => a.group === 'LIVE PROJECTS'),
-  };
+  const activeId = ordered[selected] ? `cmd-${ordered[selected].id}` : undefined;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/75 backdrop-blur-sm"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -10 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={handleKeyDown}
-            className="w-full max-w-2xl bg-[#171A21] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col text-[#F5F7FA]"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Forge Console command palette"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-[85] flex items-start justify-center bg-black/70 px-3 pt-[12vh] backdrop-blur-sm sm:px-4"
+      onClick={onClose}
+    >
+      <motion.div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quick search"
+        initial={{ opacity: 0, scale: 0.97, y: -12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: -8, transition: { duration: 0.12 } }}
+        transition={{ type: 'spring', stiffness: 520, damping: 36 }}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={onKeyDown}
+        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-night-2 text-night-text shadow-2xl"
+      >
+        <div className="flex items-center gap-3 border-b border-white/10 bg-night-3 px-4 py-3.5">
+          <Search className="h-5 w-5 shrink-0 text-night-muted" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search projects, sections, actions…"
+            aria-label="Search commands"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="console-list"
+            aria-activedescendant={activeId}
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full bg-transparent font-sans text-base text-night-text placeholder:text-night-faint focus:outline-none focus-visible:outline-none sm:text-sm"
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close quick search"
+            className="shrink-0 rounded p-1 text-night-muted transition-colors hover:bg-white/10 hover:text-white"
           >
-            {/* Input Header */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/10 bg-[#12141A]">
-              <Search className="w-5 h-5 text-[#9BA3AF] shrink-0" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedIndex(0);
-                }}
-                placeholder="Type a command, project name, or action..."
-                className="w-full bg-transparent text-sm text-[#F5F7FA] placeholder-[#6B7280] focus:outline-none font-sans"
-              />
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-[#9BA3AF] bg-white/5 border border-white/10 rounded">
-                  ESC to close
-                </span>
-                <button
-                  onClick={onClose}
-                  aria-label="Close console"
-                  className="p-1 hover:bg-white/10 rounded text-[#9BA3AF] hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-            {/* List Body */}
-            <div ref={listRef} className="max-h-[60vh] overflow-y-auto p-2 divide-y divide-white/[0.04]">
-              {filteredActions.length === 0 ? (
-                <div className="p-8 text-center text-sm text-[#6B7280]">
-                  No matching commands or projects found for &quot;{query}&quot;.
+        <div ref={listRef} id="console-list" role="listbox" aria-label="Results" className="max-h-[56vh] overflow-y-auto overscroll-contain p-2">
+          {ordered.length === 0 ? (
+            <p className="p-8 text-center text-sm text-night-faint">Nothing matches &ldquo;{query}&rdquo;. Try &ldquo;cv&rdquo; or a project name.</p>
+          ) : (
+            groupOrder.map((group) => {
+              const items = ordered.filter((c) => c.group === group);
+              if (items.length === 0) return null;
+              return (
+                <div key={group} role="group" aria-label={group} className="py-1.5">
+                  <div className="px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-night-faint">{group}</div>
+                  {items.map((item) => {
+                    const index = ordered.indexOf(item);
+                    const isSelected = index === selected;
+                    return (
+                      <div
+                        key={item.id}
+                        id={`cmd-${item.id}`}
+                        role="option"
+                        aria-selected={isSelected}
+                        data-index={index}
+                        onClick={item.run}
+                        onMouseMove={() => !isSelected && setSelected(index)}
+                        className={`relative flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition-colors ${
+                          isSelected ? 'text-white' : 'text-night-muted'
+                        }`}
+                      >
+                        {isSelected && (
+                          <motion.span
+                            layoutId="console-highlight"
+                            className="absolute inset-0 rounded-lg border border-teal/30 bg-teal/15"
+                            transition={{ type: 'spring', stiffness: 600, damping: 40 }}
+                          />
+                        )}
+                        <span className="relative flex min-w-0 items-center gap-3 pr-2">
+                          <span className="shrink-0" aria-hidden="true">
+                            {item.icon}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-white">{item.title}</span>
+                            {item.subtitle && <span className="block truncate text-[11px] text-night-muted">{item.subtitle}</span>}
+                          </span>
+                        </span>
+                        <span className="relative flex shrink-0 items-center gap-1.5 text-night-faint">
+                          {item.external && <ExternalLink className="h-3.5 w-3.5" aria-label="opens in a new tab" />}
+                          {isSelected && <CornerDownLeft className="hidden h-3.5 w-3.5 text-teal sm:block" aria-hidden="true" />}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                (Object.keys(groupedActions) as (keyof typeof groupedActions)[]).map((groupKey) => {
-                  const items = groupedActions[groupKey];
-                  if (items.length === 0) return null;
+              );
+            })
+          )}
+        </div>
 
-                  return (
-                    <div key={groupKey} className="py-2 first:pt-0 last:pb-0">
-                      <div className="px-3 py-1.5 text-[11px] font-mono tracking-wider font-semibold text-[#6B7280]">
-                        {groupKey}
-                      </div>
-                      <div className="space-y-0.5">
-                        {items.map((item) => {
-                          const itemIndex = filteredActions.indexOf(item);
-                          const isSelected = itemIndex === selectedIndex;
-
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={item.run}
-                              onMouseEnter={() => setSelectedIndex(itemIndex)}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#1D9E75]/15 text-white border border-[#1D9E75]/30'
-                                  : 'text-[#9BA3AF] hover:bg-white/5 hover:text-white border border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0 pr-2">
-                                <div className="shrink-0">{item.icon}</div>
-                                <div className="min-w-0">
-                                  <div className="font-medium text-sm text-white truncate">
-                                    {item.title}
-                                  </div>
-                                  {item.subtitle && (
-                                    <div className="text-[11px] text-[#9BA3AF] truncate">
-                                      {item.subtitle}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="shrink-0 flex items-center gap-1.5 text-[#6B7280]">
-                                {item.external && <ExternalLink className="w-3.5 h-3.5" />}
-                                {isSelected && (
-                                  <ArrowRight className="w-4 h-4 text-[#1D9E75] hidden sm:inline" />
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Footer Help */}
-            <div className="px-4 py-2.5 bg-[#12141A] border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-[#6B7280]">
-              <div className="flex items-center gap-3">
-                <span>↑↓ Navigate</span>
-                <span>↵ Select</span>
-                <span>ESC Close</span>
-              </div>
-              <div className="text-[#1D9E75] font-semibold">The Forger’s Lab</div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        <div className="hidden items-center justify-between border-t border-white/10 bg-night-3 px-4 py-2.5 font-mono text-[11px] text-night-faint sm:flex">
+          <span className="flex items-center gap-3">
+            <span>↑↓ navigate</span>
+            <span>↵ select</span>
+            <span>esc close</span>
+          </span>
+          <span className="font-semibold text-teal">The Forger&apos;s console</span>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
+
+export const ForgeConsole: React.FC<ForgeConsoleProps> = ({ isOpen, ...rest }) => (
+  <AnimatePresence>{isOpen && <Palette key="console" {...rest} />}</AnimatePresence>
+);

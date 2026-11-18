@@ -1,211 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, MotionValue, useMotionValue, useSpring } from 'motion/react';
 import { sounds } from '../utils/audio';
+import { SPRING_BOUNCY } from '../utils/motion';
 
-interface EyePosition {
-  x: number;
-  y: number;
+interface BuddyProps {
+  id: string;
+  label: string;
+  speech: string;
+  className: string;
+  floatDuration: number;
+  enterDelay: number;
+  rotate?: number;
+  activeId: string | null;
+  onPoke: (id: string) => void;
+  children: React.ReactNode;
 }
 
+const Buddy: React.FC<BuddyProps> = ({
+  id,
+  label,
+  speech,
+  className,
+  floatDuration,
+  enterDelay,
+  rotate = 0,
+  activeId,
+  onPoke,
+  children,
+}) => {
+  return (
+    <div
+      className={`absolute z-30 ${className}`}
+      style={{ rotate: `${rotate}deg` }}
+    >
+      <div className="pop-in" style={{ '--d': `${enterDelay}s` } as React.CSSProperties}>
+      <motion.button
+        type="button"
+        aria-label={`${label}: ${speech}`}
+        onClick={() => onPoke(id)}
+        drag
+        dragSnapToOrigin
+        dragElastic={0.35}
+        dragConstraints={{ left: -40, right: 40, top: -40, bottom: 40 }}
+        whileHover={{ scale: 1.12, rotate: -6 }}
+        whileTap={{ scale: 0.9 }}
+        className="relative flex touch-none select-none items-center justify-center rounded-[inherit] focus-visible:outline-offset-4 active:cursor-grabbing"
+        style={{ cursor: 'grab' }}
+      >
+        <span className="buddy-float" style={{ '--float-duration': `${floatDuration}s` } as React.CSSProperties}>
+          {children}
+        </span>
+        <AnimatePresence>
+          {activeId === id && (
+            <motion.span
+              role="status"
+              initial={{ opacity: 0, y: 6, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.9 }}
+              transition={SPRING_BOUNCY}
+              className="pointer-events-none absolute -top-10 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-ink px-2.5 py-1 font-mono text-[10px] font-bold text-white shadow-lg"
+            >
+              {speech}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+      </div>
+    </div>
+  );
+};
+
+const Pupil: React.FC<{ x: MotionValue<number>; y: MotionValue<number> }> = ({ x, y }) => (
+  <span className="relative flex h-3 w-3 items-center justify-center overflow-hidden rounded-full bg-white shadow-inner">
+    <motion.span style={{ x, y }} className="block h-1.5 w-1.5 rounded-full bg-black" />
+  </span>
+);
+
+/** Five draggable, clickable buddies orbiting the hero headline. */
 export const MascotBuddies: React.FC = () => {
-  const [activeSpeech, setActiveSpeech] = useState<{ id: string; text: string } | null>(null);
-  const [mousePos, setMousePos] = useState<EyePosition>({ x: 0, y: 0 });
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const timer = useRef<number | undefined>(undefined);
 
-  // Subtle pupil gazing following mouse cursor
+  // Eye tracking runs on motion values: zero React re-renders on mouse move
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const eyeX = useSpring(rawX, { stiffness: 300, damping: 30 });
+  const eyeY = useSpring(rawY, { stiffness: 300, damping: 30 });
+
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const centerX = window.innerWidth / 2;
-      const centerY = 320;
-      const dx = (e.clientX - centerX) / (window.innerWidth / 2);
-      const dy = (e.clientY - centerY) / 320;
-      setMousePos({
-        x: Math.max(-2.5, Math.min(2.5, dx * 2.5)),
-        y: Math.max(-2.5, Math.min(2.5, dy * 2.5)),
-      });
+    const onMove = (e: PointerEvent) => {
+      const dx = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+      const dy = (e.clientY - 320) / 320;
+      rawX.set(Math.max(-2.5, Math.min(2.5, dx * 2.5)));
+      rawY.set(Math.max(-2.5, Math.min(2.5, dy * 2.5)));
     };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.clearTimeout(timer.current);
+    };
+  }, [rawX, rawY]);
 
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  const triggerMascot = (id: string, text: string) => {
+  const poke = (id: string) => {
     sounds.playBoing();
-    setActiveSpeech({ id, text });
-    setTimeout(() => {
-      setActiveSpeech((current) => (current?.id === id ? null : current));
-    }, 2400);
+    setActiveId(id);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setActiveId(null), 2200);
   };
+
+  const shared = { activeId, onPoke: poke };
 
   return (
     <>
-      {/* =========================================================================
-          CIRCULAR ORBIT FORMATION AROUND HEADLINE (EXACTLY 5 DECORATIVE ELEMENTS)
-         ========================================================================= */}
-
-      {/* 1. Green Box Buddy — Upper Left Orbit */}
-      <motion.div
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
-        whileHover={{ scale: 1.1, rotate: -4 }}
-        whileTap={{ scale: 0.94 }}
-        drag
-        dragElastic={0.3}
-        dragConstraints={{ left: -30, right: 30, top: -30, bottom: 30 }}
-        onClick={() => triggerMascot('green-box', 'BuildVerse Hackathon Winner! 🏆')}
-        className="absolute -top-10 left-[4%] sm:left-[10%] w-11 h-11 bg-[#1E7B4F] rounded-xl shadow-md border-2 border-black/15 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none"
-        title="BuildVerse Hackathon Winner"
+      {/* Green box — upper left */}
+      <Buddy
+        id="green"
+        label="Green buddy"
+        speech="BuildVerse honourable mention! 🏆"
+        className="-top-12 left-[3%] sm:-top-10 sm:left-[8%]"
+        floatDuration={4.2}
+        enterDelay={0.55}
+        rotate={-4}
+        {...shared}
       >
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 bg-white rounded-full" />
-          <div className="w-1.5 h-1.5 bg-white rounded-full" />
-        </div>
-        <div className="w-3 h-1.5 bg-white rounded-xs mt-1 flex items-center justify-center">
-          <div className="w-full h-0.5 bg-[#1E7B4F]" />
-        </div>
+        <span className="flex h-11 w-11 flex-col items-center justify-center rounded-xl border-2 border-black/15 bg-[#1E7B4F] shadow-md">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+          </span>
+          <span className="mt-1 flex h-1.5 w-3 items-center justify-center rounded-xs bg-white">
+            <span className="h-0.5 w-full bg-[#1E7B4F]" />
+          </span>
+        </span>
+      </Buddy>
 
-        {activeSpeech?.id === 'green-box' && (
-          <motion.div
-            initial={{ scale: 0, y: 8 }}
-            animate={{ scale: 1, y: 0 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 bg-[#141618] text-white text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg shadow-lg border border-white/10 whitespace-nowrap z-40 pointer-events-none"
-          >
-            {activeSpeech.text}
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* 2. Red Circle Buddy — Upper Right Orbit */}
-      <motion.div
-        animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
-        whileHover={{ scale: 1.1, rotate: 4 }}
-        whileTap={{ scale: 0.94 }}
-        drag
-        dragElastic={0.3}
-        dragConstraints={{ left: -30, right: 30, top: -30, bottom: 30 }}
-        onClick={() => triggerMascot('red-circle', "I'm watching you build! 👀")}
-        className="absolute -top-11 right-[6%] sm:right-[12%] w-12 h-12 bg-[#E14328] rounded-full shadow-md border-2 border-black/15 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none group"
-        title="The Curious Watcher"
+      {/* Red circle — upper right (the watcher) */}
+      <Buddy
+        id="red"
+        label="Red buddy"
+        speech="I'm watching you build! 👀"
+        className="-top-12 right-[4%] sm:-top-11 sm:right-[10%]"
+        floatDuration={3.8}
+        enterDelay={0.62}
+        {...shared}
       >
-        <div className="flex items-center gap-1.5 pt-1">
-          <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center relative overflow-hidden shadow-inner">
-            <motion.div
-              style={{ x: mousePos.x, y: mousePos.y }}
-              className="w-1.5 h-1.5 bg-black rounded-full"
-            />
-          </div>
-          <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center relative overflow-hidden shadow-inner">
-            <motion.div
-              style={{ x: mousePos.x, y: mousePos.y }}
-              className="w-1.5 h-1.5 bg-black rounded-full"
-            />
-          </div>
-        </div>
-        <div className="w-2.5 h-1 border-b-2 border-black/60 rounded-full mt-0.5" />
+        <span className="flex h-12 w-12 flex-col items-center justify-center rounded-full border-2 border-black/15 bg-[#E14328] shadow-md">
+          <span className="flex items-center gap-1.5 pt-1">
+            <Pupil x={eyeX} y={eyeY} />
+            <Pupil x={eyeX} y={eyeY} />
+          </span>
+          <span className="mt-0.5 h-1 w-2.5 rounded-full border-b-2 border-black/60" />
+        </span>
+      </Buddy>
 
-        {activeSpeech?.id === 'red-circle' && (
-          <motion.div
-            initial={{ scale: 0, y: 8 }}
-            animate={{ scale: 1, y: 0 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 bg-[#141618] text-white text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg shadow-lg border border-white/10 whitespace-nowrap z-40 pointer-events-none"
-          >
-            {activeSpeech.text}
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* 3. Orange Diamond Buddy — Far Right Orbit */}
-      <motion.div
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
-        whileHover={{ scale: 1.1, rotate: 14 }}
-        whileTap={{ scale: 0.94 }}
-        drag
-        dragElastic={0.3}
-        dragConstraints={{ left: -30, right: 30, top: -30, bottom: 30 }}
-        onClick={() => triggerMascot('orange-diamond', 'Ship it! 🚀 60 FPS')}
-        className="absolute top-[42%] -right-3 sm:-right-7 w-11 h-11 bg-[#F57C20] rounded-xl shadow-md border-2 border-black/15 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none rotate-6"
-        title="The Fast Shipper"
+      {/* Orange — far right (hidden on small screens so it never covers the headline) */}
+      <Buddy
+        id="orange"
+        label="Orange buddy"
+        speech="Ship it! 🚀"
+        className="top-[40%] -right-6 hidden sm:block lg:-right-10"
+        floatDuration={4.6}
+        enterDelay={0.7}
+        rotate={8}
+        {...shared}
       >
-        <div className="flex items-center gap-1.5 -rotate-6">
-          <div className="w-1.5 h-1.5 bg-black rounded-full" />
-          <div className="w-1.5 h-1.5 bg-black rounded-full" />
-        </div>
-        <div className="w-2 h-1 bg-black/80 rounded-full mt-1 -rotate-6" />
+        <span className="flex h-11 w-11 flex-col items-center justify-center rounded-xl border-2 border-black/15 bg-[#F57C20] shadow-md">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-black" />
+            <span className="h-1.5 w-1.5 rounded-full bg-black" />
+          </span>
+          <span className="mt-1 h-1 w-2 rounded-full bg-black/80" />
+        </span>
+      </Buddy>
 
-        {activeSpeech?.id === 'orange-diamond' && (
-          <motion.div
-            initial={{ scale: 0, y: 8 }}
-            animate={{ scale: 1, y: 0 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 bg-[#141618] text-white text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg shadow-lg border border-white/10 whitespace-nowrap z-40 pointer-events-none"
-          >
-            {activeSpeech.text}
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* 4. Purple Sleepy Dome Buddy — Bottom Center Orbit */}
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 5.0, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
-        whileHover={{ scale: 1.1, rotate: -3 }}
-        whileTap={{ scale: 0.94 }}
-        drag
-        dragElastic={0.3}
-        dragConstraints={{ left: -30, right: 30, top: -30, bottom: 30 }}
-        onClick={() => triggerMascot('purple-dome', 'Dreaming up new UI... 💤')}
-        className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-14 h-8 bg-[#9D7CE8] rounded-t-full shadow-md border-2 border-black/15 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none"
-        title="Quiet Thinker"
+      {/* Purple dome — bottom centre */}
+      <Buddy
+        id="purple"
+        label="Purple buddy"
+        speech="Dreaming up new UI… 💤"
+        className="-bottom-9 left-1/2 -translate-x-1/2"
+        floatDuration={5}
+        enterDelay={0.78}
+        {...shared}
       >
-        <div className="flex items-center gap-2 pt-1">
-          <div className="w-2 h-0.5 bg-black rounded-full" />
-          <div className="w-2 h-0.5 bg-black rounded-full" />
-        </div>
+        <span className="flex h-8 w-14 items-center justify-center rounded-t-full border-2 border-black/15 bg-[#9D7CE8] pt-1 shadow-md">
+          <span className="flex items-center gap-2">
+            <span className="h-0.5 w-2 rounded-full bg-black" />
+            <span className="h-0.5 w-2 rounded-full bg-black" />
+          </span>
+        </span>
+      </Buddy>
 
-        {activeSpeech?.id === 'purple-dome' && (
-          <motion.div
-            initial={{ scale: 0, y: 8 }}
-            animate={{ scale: 1, y: 0 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 bg-[#141618] text-white text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg shadow-lg border border-white/10 whitespace-nowrap z-40 pointer-events-none"
-          >
-            {activeSpeech.text}
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* 5. Blue Pouch Buddy — Far Left Orbit */}
-      <motion.div
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
-        whileHover={{ scale: 1.1, rotate: -8 }}
-        whileTap={{ scale: 0.94 }}
-        drag
-        dragElastic={0.3}
-        dragConstraints={{ left: -30, right: 30, top: -30, bottom: 30 }}
-        onClick={() => triggerMascot('blue-pouch', 'UNILAG Math + UX Forger 📐')}
-        className="absolute top-[40%] -left-3 sm:-left-7 w-11 h-14 bg-[#3B82F6] rounded-2xl shadow-md border-2 border-black/15 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none -rotate-6"
-        title="Math & Systems"
+      {/* Blue pouch — far left */}
+      <Buddy
+        id="blue"
+        label="Blue buddy"
+        speech="UNILAG maths + UX 📐"
+        className="top-[38%] -left-6 hidden sm:block lg:-left-10"
+        floatDuration={3.5}
+        enterDelay={0.66}
+        rotate={-6}
+        {...shared}
       >
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2.5 bg-white rounded-full flex items-center justify-center">
-            <div className="w-1 h-1 bg-black rounded-full" />
-          </div>
-          <div className="w-2 h-2.5 bg-white rounded-full flex items-center justify-center">
-            <div className="w-1 h-1 bg-black rounded-full" />
-          </div>
-        </div>
-        <div className="w-3 h-1 border-b-2 border-white rounded-full mt-1" />
-
-        {activeSpeech?.id === 'blue-pouch' && (
-          <motion.div
-            initial={{ scale: 0, y: 8 }}
-            animate={{ scale: 1, y: 0 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 bg-[#141618] text-white text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg shadow-lg border border-white/10 whitespace-nowrap z-40 pointer-events-none"
-          >
-            {activeSpeech.text}
-          </motion.div>
-        )}
-      </motion.div>
+        <span className="flex h-14 w-11 flex-col items-center justify-center rounded-2xl border-2 border-black/15 bg-[#3B82F6] shadow-md">
+          <span className="flex items-center gap-1.5">
+            <span className="flex h-2.5 w-2 items-center justify-center rounded-full bg-white">
+              <span className="h-1 w-1 rounded-full bg-black" />
+            </span>
+            <span className="flex h-2.5 w-2 items-center justify-center rounded-full bg-white">
+              <span className="h-1 w-1 rounded-full bg-black" />
+            </span>
+          </span>
+          <span className="mt-1 h-1 w-3 rounded-full border-b-2 border-white" />
+        </span>
+      </Buddy>
     </>
   );
 };
